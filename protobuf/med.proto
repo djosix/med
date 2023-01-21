@@ -1,0 +1,15 @@
+syntax = "proto3";
+package proto;
+option go_package = "./internal/protobuf";
+
+message KexReq {
+    bytes nonce = 1;
+    bytes public_key_hash = 2;
+    bytes signature = 3;
+}
+
+message KexResp {
+    bytes nonce = 1;
+    bytes kex_public_key = 2;
+    bytes signature = 3;
+}
