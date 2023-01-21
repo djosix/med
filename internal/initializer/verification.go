@@ -3,46 +3,34 @@ package initializer
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 
 	"github.com/djosix/med/internal/helper"
 	"github.com/djosix/med/internal/readwriter"
 )
 
-var (
-	ServerMagic = []byte{0x92, 0x9a, 0x9b, 0x8c, 0x8d, 0x89}
-	ClientMagic = []byte{0x92, 0x9a, 0x9b, 0x9c, 0x93, 0x96}
-)
-
-func CheckMagic(rw io.ReadWriter, sendMagic, recvMagic []byte) error {
-	rw = readwriter.NewFullReadWriter(rw)
-
-	if _, err := rw.Write(sendMagic); err != nil {
-		return err
-	}
-
-	buf := make([]byte, len(recvMagic))
-	if _, err := rw.Read(buf); err != nil {
-		return err
-	}
-
-	if !bytes.Equal(buf, recvMagic) {
-		return fmt.Errorf("invalid magic")
-	}
-
-	return nil
-}
-
-func InitCheckMagic(sendMagic, recvMagic []byte) Initializer {
+func InitVerify(hash []byte) Initializer {
 	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		log.Println("InitCheckMagic")
+		log.Println("InitVerifyClient")
 
 		ctxOut = ctx
 		rwOut = rw
-		err = CheckMagic(rw, sendMagic, recvMagic)
+		err = Verify(rw, hash)
+
+		return
+	}
+}
+
+func InitGetVerified(hash []byte) Initializer {
+	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
+		log.Println("InitGetVerified")
+
+		ctxOut = ctx
+		rwOut = rw
+		err = GetVerified(rw, hash)
 
 		return
 	}
@@ -94,18 +82,6 @@ func Verify(rw io.ReadWriter, hash []byte) (err error) {
 
 	// ServerAccept
 	return f.WriteFrame([]byte{StatusAccept})
-}
-
-func InitVerify(hash []byte) Initializer {
-	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		log.Println("InitVerifyClient")
-
-		ctxOut = ctx
-		rwOut = rw
-		err = Verify(rw, hash)
-
-		return
-	}
 }
 
 func GetVerified(rw io.ReadWriter, hash []byte) error {
@@ -175,17 +151,5 @@ func GetVerified(rw io.ReadWriter, hash []byte) error {
 	default:
 		log.Fatalln("unknown remote status:", status)
 		return statusErr
-	}
-}
-
-func InitGetVerified(hash []byte) Initializer {
-	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		log.Println("InitGetVerified")
-
-		ctxOut = ctx
-		rwOut = rw
-		err = GetVerified(rw, hash)
-
-		return
 	}
 }

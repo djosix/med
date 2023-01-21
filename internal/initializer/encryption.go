@@ -13,6 +13,26 @@ import (
 	"github.com/djosix/med/internal/helper"
 )
 
+func InitEncryption(secret []byte) Initializer {
+	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
+		log.Println("InitEncryption")
+
+		secret := secret
+		if secret == nil {
+			b, ok := ctx.Value("secret").([]byte)
+			if !ok {
+				err = fmt.Errorf("secret not in context")
+				return
+			}
+			secret = b
+		}
+
+		ctxOut = ctx
+		rwOut, err = NewEncryptionLayer(rw, secret)
+		return
+	}
+}
+
 type EncryptionLayer struct {
 	inner       io.ReadWriter
 	readStream  cipher.Stream
@@ -74,24 +94,4 @@ func (el *EncryptionLayer) Write(p []byte) (n int, err error) {
 	}
 
 	return
-}
-
-func InitEncryption(secret []byte) Initializer {
-	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		log.Println("InitEncryption")
-
-		secret := secret
-		if secret == nil {
-			b, ok := ctx.Value("secret").([]byte)
-			if !ok {
-				err = fmt.Errorf("secret not in context")
-				return
-			}
-			secret = b
-		}
-
-		ctxOut = ctx
-		rwOut, err = NewEncryptionLayer(rw, secret)
-		return
-	}
 }

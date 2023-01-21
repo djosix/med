@@ -19,6 +19,22 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func InitHandshake(privateKey ed25519.PrivateKey, trustedPublicKeys []ed25519.PublicKey) Initializer {
+	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
+		log.Println("InitHandshake")
+
+		sharedSecret, err := Handshake(rw, privateKey, trustedPublicKeys)
+		if err != nil {
+			return
+		}
+
+		rwOut = rw
+		ctxOut = context.WithValue(ctx, "secret", sharedSecret)
+
+		return
+	}
+}
+
 var (
 	DefaultPublicKey = ed25519.PublicKey{
 		0x75, 0x5e, 0x48, 0x52, 0xac, 0x37, 0xc6, 0x23, 0xff, 0xab, 0x6c, 0x75, 0x37, 0x2e, 0x7, 0x25,
@@ -184,20 +200,4 @@ func Handshake(rw io.ReadWriter, privateKey ed25519.PrivateKey, trustedPublicKey
 	sharedSecret := kex.ComputeSecret(kexPrivateKey, remoteResp.KexPublicKey)
 
 	return sharedSecret, nil
-}
-
-func InitHandshake(privateKey ed25519.PrivateKey, trustedPublicKeys []ed25519.PublicKey) Initializer {
-	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		log.Println("InitHandshake")
-
-		sharedSecret, err := Handshake(rw, privateKey, trustedPublicKeys)
-		if err != nil {
-			return
-		}
-
-		rwOut = rw
-		ctxOut = context.WithValue(ctx, "secret", sharedSecret)
-
-		return
-	}
 }
