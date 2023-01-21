@@ -49,7 +49,7 @@ var (
 )
 
 func Handshake(rw io.ReadWriter, privateKey ed25519.PrivateKey, trustedPublicKeys []ed25519.PublicKey) ([]byte, error) {
-	f := readwriter.NewOrderedFramedReaderWriter(readwriter.NewPlainFramedReaderWriter(rw))
+	f := readwriter.NewOrderedFramReadWriter(readwriter.NewPlainFrameReadWriter(rw))
 
 	var localReq pb.KexReq
 	{
@@ -59,7 +59,7 @@ func Handshake(rw io.ReadWriter, privateKey ed25519.PrivateKey, trustedPublicKey
 			return nil, err
 		}
 		if n != len(localReq.Nonce) {
-			return nil, internal.UnexpectedErr
+			return nil, internal.UnexpErr
 		}
 
 		localReq.PublicKeyHash = helper.HashSalt256(
@@ -143,7 +143,7 @@ func Handshake(rw io.ReadWriter, privateKey ed25519.PrivateKey, trustedPublicKey
 	{
 		kexPublicKey, ok := kexPublicKey.([32]byte)
 		if !ok {
-			panic(internal.UnexpectedErr)
+			panic(internal.UnexpErr)
 		}
 		localResp.Nonce = remoteReq.Nonce
 		localResp.KexPublicKey = kexPublicKey[:]

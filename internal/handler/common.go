@@ -121,7 +121,7 @@ func GetCommonOpts(cmd *cobra.Command, args []string) (*CommonOpts, error) {
 		opts.Endpoint = endpoint
 
 	default:
-		panic(internal.UnexpectedErr)
+		panic(internal.UnexpErr)
 	}
 
 	if maxConn, err := flags.GetInt(CommonFlagMaxConn); err != nil {

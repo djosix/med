@@ -110,7 +110,7 @@ func ClientStart(ctx context.Context, opts *ClientOpts) error {
 		return Listen(ctx, opts.Endpoint, handler, 1)
 
 	default:
-		panic(internal.UnexpectedErr)
+		panic(internal.UnexpErr)
 	}
 }
 

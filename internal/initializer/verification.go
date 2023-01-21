@@ -50,7 +50,7 @@ func getVerifier(hash []byte, salt []byte) []byte {
 }
 
 func Verify(rw io.ReadWriter, hash []byte) (err error) {
-	f := readwriter.NewOrderedFramedReaderWriter(readwriter.NewPlainFramedReaderWriter(rw))
+	f := readwriter.NewOrderedFramReadWriter(readwriter.NewPlainFrameReadWriter(rw))
 
 	// hash is empty, directly send ServerAccept
 	if len(hash) == 0 {
@@ -88,7 +88,7 @@ func GetVerified(rw io.ReadWriter, hash []byte) error {
 	rejectErr := fmt.Errorf("server rejected")
 	statusErr := fmt.Errorf("unexpected status")
 
-	f := readwriter.NewOrderedFramedReaderWriter(readwriter.NewPlainFramedReaderWriter(rw))
+	f := readwriter.NewOrderedFramReadWriter(readwriter.NewPlainFrameReadWriter(rw))
 
 	// read server status
 	var status byte

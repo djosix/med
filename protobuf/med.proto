@@ -13,3 +13,21 @@ message KexResp {
     bytes kex_public_key = 2;
     bytes signature = 3;
 }
+
+message MedPkt {
+    uint32 target_id = 1;
+    uint32 source_id = 2;
+    MedMsg message = 3;
+}
+
+message MedMsg {
+    MedMsgType type = 1;
+    bytes content = 2;
+}
+
+enum MedMsgType {
+    META = 0;
+    CTRL = 1;
+    DATA = 2;
+    ERROR = 3;
+}

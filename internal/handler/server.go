@@ -2,13 +2,13 @@ package handler
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"time"
 
 	"github.com/djosix/med/internal"
 	"github.com/djosix/med/internal/initializer"
+
 	"github.com/spf13/cobra"
 )
 
@@ -109,12 +109,14 @@ func ServerStart(ctx context.Context, opts *ServerOpts) error {
 		return Listen(ctx, opts.Endpoint, handler, opts.MaxConnIfListen)
 
 	default:
-		panic(internal.UnexpectedErr)
+		panic(internal.UnexpErr)
 	}
 }
 
 func ServerHandler(ctx context.Context, rw io.ReadWriter) error {
-	fmt.Println("ServerHandler")
+
+	// handlers := map[uint32]MsgHandler{}
+	// return RunMsgLoop(ctx, rw, handlers)
 
 	_ = ctx
 

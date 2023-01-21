@@ -18,28 +18,28 @@ type FrameReadWriter interface {
 	WriteFrame(frame []byte) (err error)
 }
 
-type PlainFrameReaderWriter struct {
+type PlainFrameReadWriter struct {
 	inner             *FullReadWriter
 	MaxReadFrameSize  uint32
 	maxWriteFrameSize uint32
 }
 
-func NewPlainFramedReaderWriter(inner io.ReadWriter) *PlainFrameReaderWriter {
+func NewPlainFrameReadWriter(inner io.ReadWriter) *PlainFrameReadWriter {
 	mb := uint32(1024 * 1024)
-	return &PlainFrameReaderWriter{
+	return &PlainFrameReadWriter{
 		inner:             &FullReadWriter{inner},
 		MaxReadFrameSize:  16 * mb,
 		maxWriteFrameSize: 16 * mb,
 	}
 }
 
-func (f *PlainFrameReaderWriter) ReadByte() (byte, error) {
+func (f *PlainFrameReadWriter) ReadByte() (byte, error) {
 	buf := [1]byte{}
 	_, err := f.inner.Read(buf[:])
 	return buf[0], err
 }
 
-func (f *PlainFrameReaderWriter) ReadFrame() (frame []byte, err error) {
+func (f *PlainFrameReadWriter) ReadFrame() (frame []byte, err error) {
 	u64n, err := binary.ReadUvarint(f)
 	if err != nil {
 		return
@@ -56,7 +56,7 @@ func (f *PlainFrameReaderWriter) ReadFrame() (frame []byte, err error) {
 	return
 }
 
-func (f *PlainFrameReaderWriter) WriteFrame(frame []byte) (err error) {
+func (f *PlainFrameReadWriter) WriteFrame(frame []byte) (err error) {
 	size := uint32(len(frame))
 	if size > f.maxWriteFrameSize {
 		return fmt.Errorf("%v exceeds max write frame size %v", size, f.maxWriteFrameSize)
@@ -71,21 +71,21 @@ func (f *PlainFrameReaderWriter) WriteFrame(frame []byte) (err error) {
 	return
 }
 
-type OrderedFrameReaderWriter struct {
+type OrderedFrameReadWriter struct {
 	inner    FrameReadWriter
 	readIdx  byte
 	writeIdx byte
 }
 
-func NewOrderedFramedReaderWriter(inner FrameReadWriter) *OrderedFrameReaderWriter {
-	return &OrderedFrameReaderWriter{
+func NewOrderedFramReadWriter(inner FrameReadWriter) *OrderedFrameReadWriter {
+	return &OrderedFrameReadWriter{
 		inner:    inner,
 		readIdx:  0,
 		writeIdx: 0,
 	}
 }
 
-func (f *OrderedFrameReaderWriter) ReadFrame() (frame []byte, err error) {
+func (f *OrderedFrameReadWriter) ReadFrame() (frame []byte, err error) {
 	if frame, err = f.inner.ReadFrame(); err != nil {
 		return nil, err
 	}
@@ -97,38 +97,38 @@ func (f *OrderedFrameReaderWriter) ReadFrame() (frame []byte, err error) {
 	return frame[:i], nil
 }
 
-func (f *OrderedFrameReaderWriter) WriteFrame(frame []byte) (err error) {
+func (f *OrderedFrameReadWriter) WriteFrame(frame []byte) (err error) {
 	frame = append(frame, f.writeIdx)
 	f.writeIdx++
 	return f.inner.WriteFrame(frame)
 }
 
-type SnappyFrameReaderWriter struct {
+type SnappyFrameReadWriter struct {
 	inner FrameReadWriter
 }
 
-func NewSnappyFramedReaderWriter(inner FrameReadWriter) *SnappyFrameReaderWriter {
-	return &SnappyFrameReaderWriter{inner}
+func NewSnappyFrameReadWriter(inner FrameReadWriter) *SnappyFrameReadWriter {
+	return &SnappyFrameReadWriter{inner}
 }
 
-func (f *SnappyFrameReaderWriter) ReadFrame() (frame []byte, err error) {
+func (f *SnappyFrameReadWriter) ReadFrame() (frame []byte, err error) {
 	if frame, err = f.inner.ReadFrame(); err != nil {
 		return nil, err
 	}
 	return snappy.Decode(nil, frame)
 }
 
-func (f *SnappyFrameReaderWriter) WriteFrame(frame []byte) (err error) {
+func (f *SnappyFrameReadWriter) WriteFrame(frame []byte) (err error) {
 	return f.inner.WriteFrame(snappy.Encode(nil, frame))
 }
 
-type CryptedFrameReaderWriter struct {
+type CryptedFrameReadWriter struct {
 	inner   FrameReadWriter
 	rStream cipher.Stream
 	wStream cipher.Stream
 }
 
-func NewCryptedFrameReaderWriter(inner FrameReadWriter, secret []byte) (*CryptedFrameReaderWriter, error) {
+func NewCryptedFrameReadWriter(inner FrameReadWriter, secret []byte) (*CryptedFrameReadWriter, error) {
 	secret = helper.HashSalt256(secret, []byte("key"))
 
 	block, err := aes.NewCipher(secret[:16])
@@ -136,14 +136,14 @@ func NewCryptedFrameReaderWriter(inner FrameReadWriter, secret []byte) (*Crypted
 		return nil, err
 	}
 
-	return &CryptedFrameReaderWriter{
+	return &CryptedFrameReadWriter{
 		inner:   inner,
 		rStream: cipher.NewCTR(block, secret[16:]),
 		wStream: cipher.NewCTR(block, secret[16:]),
 	}, nil
 }
 
-func (f *CryptedFrameReaderWriter) ReadFrame() (frame []byte, err error) {
+func (f *CryptedFrameReadWriter) ReadFrame() (frame []byte, err error) {
 	if frame, err = f.inner.ReadFrame(); err != nil {
 		return nil, err
 	}
@@ -152,25 +152,25 @@ func (f *CryptedFrameReaderWriter) ReadFrame() (frame []byte, err error) {
 	return out, nil
 }
 
-func (f *CryptedFrameReaderWriter) WriteFrame(frame []byte) (err error) {
+func (f *CryptedFrameReadWriter) WriteFrame(frame []byte) (err error) {
 	in := make([]byte, len(frame))
 	f.wStream.XORKeyStream(in, frame)
 	return f.inner.WriteFrame(in)
 }
 
-type DebugFrameReaderWriter struct {
+type DebugFrameReadWriter struct {
 	inner FrameReadWriter
 	mu    sync.Mutex
 }
 
-func NewDebugFrameReaderWriter(inner FrameReadWriter) *DebugFrameReaderWriter {
-	return &DebugFrameReaderWriter{
+func NewDebugFrameReadWriter(inner FrameReadWriter) *DebugFrameReadWriter {
+	return &DebugFrameReadWriter{
 		inner: inner,
 		mu:    sync.Mutex{},
 	}
 }
 
-func (f *DebugFrameReaderWriter) getMsg(frame []byte, err error) string {
+func (f *DebugFrameReadWriter) getMsg(frame []byte, err error) string {
 	if err != nil {
 		return err.Error()
 	} else {
@@ -178,7 +178,7 @@ func (f *DebugFrameReaderWriter) getMsg(frame []byte, err error) string {
 	}
 }
 
-func (f *DebugFrameReaderWriter) ReadFrame() (frame []byte, err error) {
+func (f *DebugFrameReadWriter) ReadFrame() (frame []byte, err error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
@@ -188,7 +188,7 @@ func (f *DebugFrameReaderWriter) ReadFrame() (frame []byte, err error) {
 	return
 }
 
-func (f *DebugFrameReaderWriter) WriteFrame(frame []byte) (err error) {
+func (f *DebugFrameReadWriter) WriteFrame(frame []byte) (err error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 

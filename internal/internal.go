@@ -2,4 +2,7 @@ package internal
 
 import "fmt"
 
-var UnexpectedErr = fmt.Errorf("unexpected")
+var (
+	Err      = fmt.Errorf("error")
+	UnexpErr = fmt.Errorf("unexpected")
+)

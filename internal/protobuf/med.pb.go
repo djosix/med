@@ -20,6 +20,58 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type MedMsgType int32
+
+const (
+	MedMsgType_META  MedMsgType = 0
+	MedMsgType_CTRL  MedMsgType = 1
+	MedMsgType_DATA  MedMsgType = 2
+	MedMsgType_ERROR MedMsgType = 3
+)
+
+// Enum value maps for MedMsgType.
+var (
+	MedMsgType_name = map[int32]string{
+		0: "META",
+		1: "CTRL",
+		2: "DATA",
+		3: "ERROR",
+	}
+	MedMsgType_value = map[string]int32{
+		"META":  0,
+		"CTRL":  1,
+		"DATA":  2,
+		"ERROR": 3,
+	}
+)
+
+func (x MedMsgType) Enum() *MedMsgType {
+	p := new(MedMsgType)
+	*p = x
+	return p
+}
+
+func (x MedMsgType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (MedMsgType) Descriptor() protoreflect.EnumDescriptor {
+	return file_med_proto_enumTypes[0].Descriptor()
+}
+
+func (MedMsgType) Type() protoreflect.EnumType {
+	return &file_med_proto_enumTypes[0]
+}
+
+func (x MedMsgType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use MedMsgType.Descriptor instead.
+func (MedMsgType) EnumDescriptor() ([]byte, []int) {
+	return file_med_proto_rawDescGZIP(), []int{0}
+}
+
 type KexReq struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -146,6 +198,124 @@ func (x *KexResp) GetSignature() []byte {
 	return nil
 }
 
+type MedPkt struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	TargetId uint32  `protobuf:"varint,1,opt,name=target_id,json=targetId,proto3" json:"target_id,omitempty"`
+	SourceId uint32  `protobuf:"varint,2,opt,name=source_id,json=sourceId,proto3" json:"source_id,omitempty"`
+	Message  *MedMsg `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+}
+
+func (x *MedPkt) Reset() {
+	*x = MedPkt{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_med_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *MedPkt) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MedPkt) ProtoMessage() {}
+
+func (x *MedPkt) ProtoReflect() protoreflect.Message {
+	mi := &file_med_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MedPkt.ProtoReflect.Descriptor instead.
+func (*MedPkt) Descriptor() ([]byte, []int) {
+	return file_med_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *MedPkt) GetTargetId() uint32 {
+	if x != nil {
+		return x.TargetId
+	}
+	return 0
+}
+
+func (x *MedPkt) GetSourceId() uint32 {
+	if x != nil {
+		return x.SourceId
+	}
+	return 0
+}
+
+func (x *MedPkt) GetMessage() *MedMsg {
+	if x != nil {
+		return x.Message
+	}
+	return nil
+}
+
+type MedMsg struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Type    MedMsgType `protobuf:"varint,1,opt,name=type,proto3,enum=proto.MedMsgType" json:"type,omitempty"`
+	Content []byte     `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+}
+
+func (x *MedMsg) Reset() {
+	*x = MedMsg{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_med_proto_msgTypes[3]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *MedMsg) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MedMsg) ProtoMessage() {}
+
+func (x *MedMsg) ProtoReflect() protoreflect.Message {
+	mi := &file_med_proto_msgTypes[3]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MedMsg.ProtoReflect.Descriptor instead.
+func (*MedMsg) Descriptor() ([]byte, []int) {
+	return file_med_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *MedMsg) GetType() MedMsgType {
+	if x != nil {
+		return x.Type
+	}
+	return MedMsgType_META
+}
+
+func (x *MedMsg) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
+}
+
 var File_med_proto protoreflect.FileDescriptor
 
 var file_med_proto_rawDesc = []byte{
@@ -162,9 +332,24 @@ var file_med_proto_rawDesc = []byte{
 	0x5f, 0x70, 0x75, 0x62, 0x6c, 0x69, 0x63, 0x5f, 0x6b, 0x65, 0x79, 0x18, 0x02, 0x20, 0x01, 0x28,
 	0x0c, 0x52, 0x0c, 0x6b, 0x65, 0x78, 0x50, 0x75, 0x62, 0x6c, 0x69, 0x63, 0x4b, 0x65, 0x79, 0x12,
 	0x1c, 0x0a, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x18, 0x03, 0x20, 0x01,
-	0x28, 0x0c, 0x52, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x42, 0x15, 0x5a,
-	0x13, 0x2e, 0x2f, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x2f, 0x70, 0x72, 0x6f, 0x74,
-	0x6f, 0x62, 0x75, 0x66, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x28, 0x0c, 0x52, 0x09, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65, 0x22, 0x6b, 0x0a,
+	0x06, 0x4d, 0x65, 0x64, 0x50, 0x6b, 0x74, 0x12, 0x1b, 0x0a, 0x09, 0x74, 0x61, 0x72, 0x67, 0x65,
+	0x74, 0x5f, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x08, 0x74, 0x61, 0x72, 0x67,
+	0x65, 0x74, 0x49, 0x64, 0x12, 0x1b, 0x0a, 0x09, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x5f, 0x69,
+	0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x08, 0x73, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x49,
+	0x64, 0x12, 0x27, 0x0a, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x18, 0x03, 0x20, 0x01,
+	0x28, 0x0b, 0x32, 0x0d, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x4d, 0x65, 0x64, 0x4d, 0x73,
+	0x67, 0x52, 0x07, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x22, 0x49, 0x0a, 0x06, 0x4d, 0x65,
+	0x64, 0x4d, 0x73, 0x67, 0x12, 0x25, 0x0a, 0x04, 0x74, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x0e, 0x32, 0x11, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x4d, 0x65, 0x64, 0x4d, 0x73,
+	0x67, 0x54, 0x79, 0x70, 0x65, 0x52, 0x04, 0x74, 0x79, 0x70, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x63,
+	0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x63, 0x6f,
+	0x6e, 0x74, 0x65, 0x6e, 0x74, 0x2a, 0x35, 0x0a, 0x0a, 0x4d, 0x65, 0x64, 0x4d, 0x73, 0x67, 0x54,
+	0x79, 0x70, 0x65, 0x12, 0x08, 0x0a, 0x04, 0x4d, 0x45, 0x54, 0x41, 0x10, 0x00, 0x12, 0x08, 0x0a,
+	0x04, 0x43, 0x54, 0x52, 0x4c, 0x10, 0x01, 0x12, 0x08, 0x0a, 0x04, 0x44, 0x41, 0x54, 0x41, 0x10,
+	0x02, 0x12, 0x09, 0x0a, 0x05, 0x45, 0x52, 0x52, 0x4f, 0x52, 0x10, 0x03, 0x42, 0x15, 0x5a, 0x13,
+	0x2e, 0x2f, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x2f, 0x70, 0x72, 0x6f, 0x74, 0x6f,
+	0x62, 0x75, 0x66, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -179,17 +364,23 @@ func file_med_proto_rawDescGZIP() []byte {
 	return file_med_proto_rawDescData
 }
 
-var file_med_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_med_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_med_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_med_proto_goTypes = []interface{}{
-	(*KexReq)(nil),  // 0: proto.KexReq
-	(*KexResp)(nil), // 1: proto.KexResp
+	(MedMsgType)(0), // 0: proto.MedMsgType
+	(*KexReq)(nil),  // 1: proto.KexReq
+	(*KexResp)(nil), // 2: proto.KexResp
+	(*MedPkt)(nil),  // 3: proto.MedPkt
+	(*MedMsg)(nil),  // 4: proto.MedMsg
 }
 var file_med_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	4, // 0: proto.MedPkt.message:type_name -> proto.MedMsg
+	0, // 1: proto.MedMsg.type:type_name -> proto.MedMsgType
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_med_proto_init() }
@@ -222,19 +413,44 @@ func file_med_proto_init() {
 				return nil
 			}
 		}
+		file_med_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*MedPkt); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_med_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*MedMsg); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_med_proto_rawDesc,
-			NumEnums:      0,
-			NumMessages:   2,
+			NumEnums:      1,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_med_proto_goTypes,
 		DependencyIndexes: file_med_proto_depIdxs,
+		EnumInfos:         file_med_proto_enumTypes,
 		MessageInfos:      file_med_proto_msgTypes,
 	}.Build()
 	File_med_proto = out.File

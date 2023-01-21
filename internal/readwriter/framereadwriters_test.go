@@ -68,7 +68,7 @@ func TestPlainFramedReaderWriter(t *testing.T) {
 		inner.ReadBuf = append(inner.ReadBuf, 0)
 	}
 
-	rw := NewPlainFramedReaderWriter(inner)
+	rw := NewPlainFrameReadWriter(inner)
 	frame, err := rw.ReadFrame()
 	// fmt.Println(buf)
 	// fmt.Println(inner.ReadBuf)
@@ -104,8 +104,8 @@ func TestPlainFramedReaderWriter(t *testing.T) {
 
 func TestSnappyFramedReaderWriter(t *testing.T) {
 	inner := NewTestReadWriter()
-	rw1 := NewPlainFramedReaderWriter(inner)
-	rw2 := NewSnappyFramedReaderWriter(rw1)
+	rw1 := NewPlainFrameReadWriter(inner)
+	rw2 := NewSnappyFrameReadWriter(rw1)
 
 	buf := []byte{}
 	for i := 0; i < 1000; i++ {
@@ -137,8 +137,8 @@ func TestSnappyFramedReaderWriter(t *testing.T) {
 }
 func TestCryptedFrameReaderWriter(t *testing.T) {
 	inner := NewTestReadWriter()
-	rw1 := NewPlainFramedReaderWriter(inner)
-	rw2, err := NewCryptedFrameReaderWriter(rw1, []byte("asodinaosdnoainsd"))
+	rw1 := NewPlainFrameReadWriter(inner)
+	rw2, err := NewCryptedFrameReadWriter(rw1, []byte("asodinaosdnoainsd"))
 	if err != nil {
 		t.Error(err)
 		return
