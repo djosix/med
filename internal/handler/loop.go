@@ -13,10 +13,8 @@ import (
 )
 
 type MsgHandler interface {
-	// MsgInCh() <-chan *pb.MedMsg
-	// Run(loop *MsgLoop, msgOutCh chan<- *pb.MedMsg)
-	MsgInFunc(*pb.MedMsg) error
-	Run(loop *MsgLoop, msgOutFunc func(*pb.MedMsg) error)
+	MsgInCh() chan<- *pb.MedMsg
+	RunLoop(loop *MsgLoop, msgOutCh chan<- *pb.MedMsg)
 }
 
 type MsgLoop struct {
@@ -55,31 +53,15 @@ func RunMsgLoop(ctx context.Context, rw io.ReadWriter, msgHandlers map[uint32]Ms
 		loop.wg.Add(1)
 		go func(h MsgHandler, id uint32) {
 			defer loop.wg.Done()
-			h.Run(loop, loop.createOutMsgFunc(id))
+			h.RunLoop(loop, loop.createMsgOutCh(id))
 		}(h, id)
 	}
 
 	return loop.runAllLoops()
 }
 
-func (loop *MsgLoop) createOutMsgFunc(handlerID uint32) func(*pb.MedMsg) error {
-	return func(msg *pb.MedMsg) error {
-		pkt := &pb.MedPkt{
-			SourceId: handlerID,
-			TargetId: handlerID,
-			Message:  msg,
-		}
-		select {
-		case loop.pktOutCh <- pkt:
-			return nil
-		case <-loop.ctx.Done():
-			return internal.Err
-		}
-	}
-}
-
 func (loop *MsgLoop) createMsgOutCh(handlerID uint32) chan<- *pb.MedMsg {
-	msgCh := make(chan *pb.MedMsg, 1)
+	msgOutCh := make(chan *pb.MedMsg, 1)
 	loop.wg.Add(1)
 	go func() {
 		defer loop.wg.Done()
@@ -87,7 +69,7 @@ func (loop *MsgLoop) createMsgOutCh(handlerID uint32) chan<- *pb.MedMsg {
 			var msg *pb.MedMsg
 
 			select {
-			case msg = <-msgCh:
+			case msg = <-msgOutCh:
 			case <-loop.ctx.Done():
 				return
 			}
@@ -105,7 +87,7 @@ func (loop *MsgLoop) createMsgOutCh(handlerID uint32) chan<- *pb.MedMsg {
 			}
 		}
 	}()
-	return msgCh
+	return msgOutCh
 }
 
 func (loop *MsgLoop) CreateMsgHandler(h MsgHandler) uint32 {
@@ -205,7 +187,14 @@ func (loop *MsgLoop) dispatchToHandler(pkt *pb.MedPkt) error {
 		return internal.Err
 	}
 
-	return h.MsgInFunc(pkt.Message)
+	select {
+	case h.MsgInCh() <- pkt.Message:
+	case <-loop.Done():
+		return internal.Err
+	default:
+		return internal.Err
+	}
+	return nil
 }
 
 func (loop *MsgLoop) writeLoop() {

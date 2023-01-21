@@ -1,23 +1,25 @@
 package handler
 
 import (
-	"github.com/djosix/med/internal"
 	pb "github.com/djosix/med/internal/protobuf"
 )
 
-type ClientMsgHandler struct {
+type MsgHandlerImpl struct {
 	msgInCh chan *pb.MedMsg
 }
 
-func (h *ClientMsgHandler) InputMsg(msg *pb.MedMsg) error {
-	select {
-	case h.msgInCh <- msg:
-		return nil
-	default:
-		return internal.Err
-	}
+func (h *MsgHandlerImpl) MsgInCh(msg *pb.MedMsg) chan<- *pb.MedMsg {
+	return h.msgInCh
 }
 
-func (h *ClientMsgHandler) Run(loop *MsgLoop, msgOutCh chan<- *pb.MedMsg) {
+func (h *MsgHandlerImpl) RunLoop(loop *MsgLoop, msgOutCh chan<- *pb.MedMsg) {
+	panic("not implemented")
+}
+
+type ClientMsgHandler struct {
+	MsgHandlerImpl
+}
+
+func (h *ClientMsgHandler) RunLoop(loop *MsgLoop, msgOutCh chan<- *pb.MedMsg) {
 
 }
