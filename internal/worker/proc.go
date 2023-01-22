@@ -11,6 +11,12 @@ type ProcImpl struct {
 	msgInCh chan *pb.MedMsg
 }
 
+func NewProcImpl(inChSize int) ProcImpl {
+	return ProcImpl{
+		msgInCh: make(chan *pb.MedMsg, inChSize),
+	}
+}
+
 func (h *ProcImpl) MsgInCh() chan<- *pb.MedMsg {
 	return h.msgInCh
 }

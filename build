@@ -1,0 +1,20 @@
+#!/bin/bash
+
+set -e
+
+declare PROTO_DIR="./protobuf"
+declare BIN="./med"
+declare TARGET="$1"
+declare LDFLAGS=""
+
+case "$TARGET" in
+    debug)   LDFLAGS="" ;;
+    release) LDFLAGS="-w -s" ;;
+    *)       >&2 echo "error: unexpected target: $TARGET" && exit 1  ;;
+esac
+
+set -x
+    
+rm -f "$BIN"
+protoc -I="$PROTO_DIR" --go_out=. "$PROTO_DIR/med.proto"
+go build -ldflags="$LDFLAGS" -o "$BIN" ./main.go

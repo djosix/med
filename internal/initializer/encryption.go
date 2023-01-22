@@ -34,14 +34,14 @@ func InitEncryption(secret []byte) Initializer {
 }
 
 type EncryptionLayer struct {
-	inner       io.ReadWriter
+	io.ReadWriter
 	readStream  cipher.Stream
 	readMutex   sync.Mutex
 	writeStream cipher.Stream
 	writeMutex  sync.Mutex
 }
 
-func NewEncryptionLayer(inner io.ReadWriter, secret []byte) (*EncryptionLayer, error) {
+func NewEncryptionLayer(rw io.ReadWriter, secret []byte) (*EncryptionLayer, error) {
 	hash := helper.Hash256(secret)
 	key, iv := hash[:16], hash[16:]
 	block, err := aes.NewCipher(key)
@@ -50,7 +50,7 @@ func NewEncryptionLayer(inner io.ReadWriter, secret []byte) (*EncryptionLayer, e
 	}
 
 	el := EncryptionLayer{
-		inner:       inner,
+		ReadWriter:  rw,
 		readStream:  cipher.NewCTR(block, iv),
 		readMutex:   sync.Mutex{},
 		writeStream: cipher.NewCTR(block, iv),
@@ -66,7 +66,7 @@ func (el *EncryptionLayer) Read(p []byte) (n int, err error) {
 
 	buf := make([]byte, len(p)) // TODO
 
-	n, err = el.inner.Read(buf)
+	n, err = el.ReadWriter.Read(buf)
 	if err != nil {
 		return
 	}
@@ -85,7 +85,7 @@ func (el *EncryptionLayer) Write(p []byte) (n int, err error) {
 	buf := make([]byte, len(p))
 	el.writeStream.XORKeyStream(buf, p)
 
-	n, err = el.inner.Write(buf)
+	n, err = el.ReadWriter.Write(buf)
 	if err != nil {
 		return
 	}

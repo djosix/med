@@ -113,9 +113,11 @@ func ClientStart(ctx context.Context, opts *ClientOpts) error {
 }
 
 func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
+	log.Println("ClientHandler BEGIN")
+	defer log.Println("ClientHandler END")
 
 	var loop worker.Loop = worker.NewLoop(ctx, rw)
-	// loop.Start(&worker.ProcImpl{})
+	loop.Start(worker.NewExampleProc("this is a message from med client"))
 	loop.Run()
 
 	return nil

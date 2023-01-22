@@ -2,14 +2,20 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"sync"
+	"time"
 
-	"github.com/djosix/med/internal"
 	pb "github.com/djosix/med/internal/protobuf"
 	"github.com/djosix/med/internal/readwriter"
 	"google.golang.org/protobuf/proto"
+)
+
+var (
+	ErrLoopClosed = fmt.Errorf("loop closed")
+	ErrTimeout    = fmt.Errorf("timeout")
 )
 
 type Loop interface {
@@ -23,7 +29,7 @@ type Loop interface {
 type LoopImpl struct {
 	lastProcID uint32
 	procs      map[uint32]Proc
-	procsMut   sync.Mutex
+	procsLock  sync.Mutex
 	pktInCh    chan *pb.MedPkt
 	pktOutCh   chan *pb.MedPkt
 	wg         sync.WaitGroup
@@ -35,7 +41,7 @@ type LoopImpl struct {
 func NewLoop(ctx context.Context, rw io.ReadWriter) *LoopImpl {
 	var frameRw readwriter.FrameReadWriter
 	frameRw = readwriter.NewPlainFrameReadWriter(rw)
-	frameRw = readwriter.NewSnappyFrameReadWriter(frameRw) // compress frames
+	// frameRw = readwriter.NewSnappyFrameReadWriter(frameRw) // compress frames
 
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithCancel(ctx)
@@ -43,7 +49,7 @@ func NewLoop(ctx context.Context, rw io.ReadWriter) *LoopImpl {
 	loop := &LoopImpl{
 		lastProcID: 0,
 		procs:      map[uint32]Proc{},
-		procsMut:   sync.Mutex{},
+		procsLock:  sync.Mutex{},
 		pktInCh:    make(chan *pb.MedPkt),
 		pktOutCh:   make(chan *pb.MedPkt),
 		wg:         sync.WaitGroup{},
@@ -107,16 +113,12 @@ func (loop *LoopImpl) Done() <-chan struct{} {
 	return loop.ctx.Done()
 }
 
-func (loop *LoopImpl) Cancel() {
-	loop.cancel()
-}
-
 func (loop *LoopImpl) Start(p Proc) (procID uint32) {
-	loop.procsMut.Lock()
-	defer loop.procsMut.Unlock()
+	loop.procsLock.Lock()
+	defer loop.procsLock.Unlock()
 
-	loop.lastProcID++
-	procID = loop.lastProcID
+	procID = loop.lastProcID + 1
+	loop.lastProcID = procID
 	loop.procs[procID] = p
 
 	loop.wg.Add(1)
@@ -129,8 +131,8 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 }
 
 func (loop *LoopImpl) Remove(procID uint32) (ok bool) {
-	loop.procsMut.Lock()
-	defer loop.procsMut.Unlock()
+	loop.procsLock.Lock()
+	defer loop.procsLock.Unlock()
 
 	_, ok = loop.procs[procID]
 	if !ok {
@@ -141,7 +143,12 @@ func (loop *LoopImpl) Remove(procID uint32) (ok bool) {
 	return
 }
 
+func (loop *LoopImpl) Cancel() {
+	loop.cancel()
+}
+
 func (loop *LoopImpl) readLoop() {
+	defer log.Println("readLoop done")
 	for {
 		frame, err := loop.frameRw.ReadFrame()
 		if err != nil {
@@ -153,11 +160,16 @@ func (loop *LoopImpl) readLoop() {
 			log.Println("cannot unmarshal frame to MedPkt:", err)
 			continue
 		}
+		if inPkt.Message.Type == pb.MedMsgType_ERROR {
+			fmt.Println("readLoop:", "got error pkt:", inPkt.String())
+			continue
+		}
 		loop.pktInCh <- &inPkt
 	}
 }
 
 func (loop *LoopImpl) dispatchLoop() {
+	defer log.Println("dispatchLoop done")
 	for {
 		select {
 		case inPkt := <-loop.pktInCh:
@@ -165,7 +177,9 @@ func (loop *LoopImpl) dispatchLoop() {
 				log.Println("msg from loop.inPktCh is nil")
 				return
 			}
-			if err := loop.dispatchToHandler(inPkt); err != nil {
+			fmt.Println("dispatchLoop:", "got inPkt", inPkt.String())
+			if err := loop.dispatchToProc(inPkt); err != nil {
+				fmt.Println("dispatchLoop:", "dispatch error:", err)
 				loop.pktOutCh <- &pb.MedPkt{
 					TargetId: inPkt.SourceId,
 					SourceId: inPkt.TargetId,
@@ -181,26 +195,29 @@ func (loop *LoopImpl) dispatchLoop() {
 	}
 }
 
-func (loop *LoopImpl) dispatchToHandler(pkt *pb.MedPkt) error {
-	loop.procsMut.Lock()
-	defer loop.procsMut.Unlock()
+func (loop *LoopImpl) dispatchToProc(pkt *pb.MedPkt) error {
+	loop.procsLock.Lock()
+	defer loop.procsLock.Unlock()
 
 	h, ok := loop.procs[pkt.TargetId]
 	if !ok {
-		return internal.Err
+		return fmt.Errorf("proc not found with ID %v", pkt.TargetId)
 	}
+
+	timeout := time.NewTimer(time.Duration(5) * time.Second)
 
 	select {
 	case h.MsgInCh() <- pkt.Message:
 	case <-loop.Done():
-		return internal.Err
-	default:
-		return internal.Err
+		return fmt.Errorf("loop closed")
+	case <-timeout.C:
+		return fmt.Errorf("dispatch timeout")
 	}
 	return nil
 }
 
 func (loop *LoopImpl) writeLoop() {
+	defer log.Println("writeLoop done")
 	for {
 		select {
 		case msg := <-loop.pktOutCh:

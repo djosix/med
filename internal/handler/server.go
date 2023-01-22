@@ -115,11 +115,12 @@ func ServerStart(ctx context.Context, opts *ServerOpts) error {
 }
 
 func ServerHandler(ctx context.Context, rw io.ReadWriter) error {
+	log.Println("ServerHandler BEGIN")
+	defer log.Println("ServerHandler END")
 
 	var loop worker.Loop = worker.NewLoop(ctx, rw)
+	loop.Start(worker.NewExampleProc("this is a message from med server"))
 	loop.Run()
-
-	log.Println("ServerHandler END")
 
 	return nil
 }
