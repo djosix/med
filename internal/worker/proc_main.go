@@ -17,12 +17,6 @@ func NewClientMainProc() *ClientMainProc {
 
 func (p *ClientMainProc) Run(ctx ProcRunCtx) {
 
-	// go func() {
-	// 	for {
-	// 		select <-
-	// 	}
-	// }()
-
 	{
 		mainMsg := p.getStartReqMsg(pb.MedProcType_MedProcTypeExample)
 		content, err := proto.Marshal(mainMsg)

@@ -85,7 +85,8 @@ func (loop *LoopImpl) Run() {
 	loop.wg.Wait()
 
 	if conn, ok := loop.ctx.Value("conn").(net.Conn); ok {
-		helper.RefreshConnRW(conn)
+		fmt.Println("helper.RefreshIO(conn)")
+		helper.RefreshIO(conn)
 	} else {
 		panic("cannot find conn in ctx")
 	}
@@ -98,8 +99,9 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 	procID = loop.lastProcID + 1
 	loop.lastProcID = procID
 
-	ctx, cancel := context.WithCancel(loop.ctx)
-	ctx = context.WithValue(loop.ctx, "procID", procID)
+	ctx, cancel := context.WithCancel(
+		context.WithValue(loop.ctx, "procID", procID),
+	)
 
 	msgInCh := make(chan *pb.MedMsg)
 	msgOutCh := make(chan *pb.MedMsg, 1)
@@ -107,10 +109,14 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 	loop.wg.Add(1)
 	go func() {
 		defer loop.wg.Done()
+		defer fmt.Println("done msgOutCh loop of proc", procID)
 		for {
 			var msg *pb.MedMsg
 			select {
 			case msg = <-msgOutCh:
+				if msg == nil {
+					return // msgOutCh is closed
+				}
 			case <-ctx.Done():
 				return
 			}
@@ -119,11 +125,12 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 				TargetID: procID,
 				Message:  msg,
 			}
-			select {
-			case loop.pktOutCh <- pkt:
-			case <-ctx.Done():
-				return
-			}
+			loop.pktOutCh <- pkt
+			// select {
+			// case loop.pktOutCh <- pkt:
+			// case <-ctx.Done():
+			// 	return
+			// }
 		}
 	}()
 
@@ -157,6 +164,7 @@ func (loop *LoopImpl) Remove(procID uint32) bool {
 	p, ok := loop.procData[procID]
 	if ok {
 		delete(loop.procData, procID)
+		close(p.msgInCh)
 		p.cancel()
 	}
 	return ok
@@ -170,7 +178,8 @@ func (loop *LoopImpl) Cancel() {
 	loop.cancel()
 
 	if conn, ok := loop.ctx.Value("conn").(net.Conn); ok {
-		helper.BreakConnRW(conn)
+		fmt.Println("helper.BreakIO(conn)")
+		helper.BreakIO(conn)
 	} else {
 		panic("cannot find conn in ctx")
 	}

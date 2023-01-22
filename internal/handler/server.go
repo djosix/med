@@ -117,7 +117,8 @@ func ServerHandler(ctx context.Context, rw io.ReadWriter) error {
 	defer log.Println("ServerHandler END")
 
 	var loop worker.Loop = worker.NewLoop(ctx, rw)
-	loop.Start(worker.NewExampleProc("message from server"))
+	// loop.Start(worker.NewExampleProc("message from server"))
+	loop.Start(worker.NewServerExecProc())
 	loop.Run()
 
 	{

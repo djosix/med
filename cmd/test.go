@@ -5,16 +5,8 @@ package cmd
 
 import (
 	"fmt"
-	"io"
-	"log"
-	"os"
-	"os/exec"
-	"os/signal"
-	"syscall"
 
-	"github.com/creack/pty"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 // testCmd represents the test command
@@ -34,43 +26,54 @@ func init() {
 func mainForTest(cmd *cobra.Command, args []string) error {
 	_, _ = cmd, args
 
-	// Create arbitrary command.
-	c := exec.Command("bash")
+	done := make(chan struct{})
+	close(done)
+	close(done)
 
-	// Start the command with a pty.
-	ptmx, err := pty.Start(c)
-	if err != nil {
-		return err
+	select {
+	case <-done:
+		fmt.Println("done")
+	default:
+		fmt.Println("default")
 	}
-	// Make sure to close the pty at the end.
-	defer func() { _ = ptmx.Close() }() // Best effort.
 
-	// Handle pty size.
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, syscall.SIGWINCH)
-	go func() {
-		for range ch {
-			if err := pty.InheritSize(os.Stdin, ptmx); err != nil {
-				log.Printf("error resizing pty: %s", err)
-			}
-		}
-	}()
-	ch <- syscall.SIGWINCH                        // Initial resize.
-	defer func() { signal.Stop(ch); close(ch) }() // Cleanup signals when done.
+	// // Create arbitrary command.
+	// c := exec.Command("bash")
 
-	// Set stdin in raw mode.
-	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
-	if err != nil {
-		panic(err)
-	}
-	defer func() { _ = term.Restore(int(os.Stdin.Fd()), oldState) }() // Best effort.
+	// // Start the command with a pty.
+	// ptmx, err := pty.Start(c)
+	// if err != nil {
+	// 	return err
+	// }
+	// // Make sure to close the pty at the end.
+	// defer func() { _ = ptmx.Close() }() // Best effort.
 
-	// Copy stdin to the pty and the pty to stdout.
-	// NOTE: The goroutine will keep reading until the next keystroke before returning.
-	go func() { _, _ = io.Copy(ptmx, os.Stdin) }()
-	_, _ = io.Copy(os.Stdout, ptmx)
+	// // Handle pty size.
+	// ch := make(chan os.Signal, 1)
+	// signal.Notify(ch, syscall.SIGWINCH)
+	// go func() {
+	// 	for range ch {
+	// 		if err := pty.InheritSize(os.Stdin, ptmx); err != nil {
+	// 			log.Printf("error resizing pty: %s", err)
+	// 		}
+	// 	}
+	// }()
+	// ch <- syscall.SIGWINCH                        // Initial resize.
+	// defer func() { signal.Stop(ch); close(ch) }() // Cleanup signals when done.
 
-	return nil
+	// // Set stdin in raw mode.
+	// oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// defer func() { _ = term.Restore(int(os.Stdin.Fd()), oldState) }() // Best effort.
+
+	// // Copy stdin to the pty and the pty to stdout.
+	// // NOTE: The goroutine will keep reading until the next keystroke before returning.
+	// go func() { _, _ = io.Copy(ptmx, os.Stdin) }()
+	// _, _ = io.Copy(os.Stdout, ptmx)
+
+	// return nil
 
 	// message := pb.Message{
 	// 	Content: &pb.Message_C1{
@@ -95,4 +98,6 @@ func mainForTest(cmd *cobra.Command, args []string) error {
 
 	// fmt.Println("src:", len(data))
 	// fmt.Println("dst:", len(encoded))
+
+	return nil
 }
