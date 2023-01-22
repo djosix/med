@@ -5,23 +5,73 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"log"
+	"os"
+	"os/exec"
+	"os/signal"
+	"syscall"
 
-	"github.com/golang/snappy"
+	"github.com/creack/pty"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 // testCmd represents the test command
 var testCmd = &cobra.Command{
 	Use: "test",
-	Run: mainForTest,
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := mainForTest(cmd, args); err != nil {
+			fmt.Println("error:", err)
+		}
+	},
 }
 
 func init() {
 	clientCmd.AddCommand(testCmd)
 }
 
-func mainForTest(cmd *cobra.Command, args []string) {
+func mainForTest(cmd *cobra.Command, args []string) error {
 	_, _ = cmd, args
+
+	// Create arbitrary command.
+	c := exec.Command("bash")
+
+	// Start the command with a pty.
+	ptmx, err := pty.Start(c)
+	if err != nil {
+		return err
+	}
+	// Make sure to close the pty at the end.
+	defer func() { _ = ptmx.Close() }() // Best effort.
+
+	// Handle pty size.
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGWINCH)
+	go func() {
+		for range ch {
+			if err := pty.InheritSize(os.Stdin, ptmx); err != nil {
+				log.Printf("error resizing pty: %s", err)
+			}
+		}
+	}()
+	ch <- syscall.SIGWINCH                        // Initial resize.
+	defer func() { signal.Stop(ch); close(ch) }() // Cleanup signals when done.
+
+	// Set stdin in raw mode.
+	oldState, err := term.MakeRaw(int(os.Stdin.Fd()))
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = term.Restore(int(os.Stdin.Fd()), oldState) }() // Best effort.
+
+	// Copy stdin to the pty and the pty to stdout.
+	// NOTE: The goroutine will keep reading until the next keystroke before returning.
+	go func() { _, _ = io.Copy(ptmx, os.Stdin) }()
+	_, _ = io.Copy(os.Stdout, ptmx)
+
+	return nil
+
 	// message := pb.Message{
 	// 	Content: &pb.Message_C1{
 	// 		C1: &pb.Content1{
@@ -35,14 +85,14 @@ func mainForTest(cmd *cobra.Command, args []string) {
 	// 	return
 	// }
 	// fmt.Println("Message:", data)
-	data := []byte{}
-	for len(data) < 1000 {
-		data = append(data, byte(len(data)%256))
-	}
+	// data := []byte{}
+	// for len(data) < 1000 {
+	// 	data = append(data, byte(len(data)%256))
+	// }
 
-	encoded := []byte{}
-	encoded = snappy.Encode(encoded, data)
+	// encoded := []byte{}
+	// encoded = snappy.Encode(encoded, data)
 
-	fmt.Println("src:", len(data))
-	fmt.Println("dst:", len(encoded))
+	// fmt.Println("src:", len(data))
+	// fmt.Println("dst:", len(encoded))
 }

@@ -90,7 +90,7 @@ func (el *EncryptionLayer) Write(p []byte) (n int, err error) {
 		return
 	}
 	if n != len(p) {
-		panic(internal.UnexpErr)
+		panic(internal.Unexpected)
 	}
 
 	return

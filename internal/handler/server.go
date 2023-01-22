@@ -109,7 +109,7 @@ func ServerStart(ctx context.Context, opts *ServerOpts) error {
 		return Listen(ctx, opts.Endpoint, handler, opts.MaxConnIfListen)
 
 	default:
-		panic(internal.UnexpErr)
+		panic(internal.Unexpected)
 	}
 }
 

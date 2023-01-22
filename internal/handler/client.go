@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 
@@ -110,33 +109,41 @@ func ClientStart(ctx context.Context, opts *ClientOpts) error {
 		return Listen(ctx, opts.Endpoint, handler, 1)
 
 	default:
-		panic(internal.UnexpErr)
+		panic(internal.Unexpected)
 	}
 }
 
 func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
-	log.Println("ClientHandler")
+	// clientMsgH := ClientMsgHandler{}
 
-	_ = ctx
-
-	data := []byte("ClientMessage\n")
-	log.Println("Write:", string(data))
-	n, err := rw.Write(data)
-	if err != nil {
-		return err
-	}
-	if n != len(data) {
-		return fmt.Errorf("cannot write full")
-	}
-
-	buf := make([]byte, 1024)
-	log.Println("read")
-	n, err = rw.Read(buf)
-	log.Println("read done")
-	if err != nil {
-		return err
-	}
-	log.Println("Read", n, err, string(buf))
+	var loop MsgLoop = NewMedLoop(ctx, rw)
+	// loop.AddHandler()
+	loop.Run()
 
 	return nil
+
+	// clientMsgH := ClientMsgHandler{}
+
+	// msgLoopErrCh := make(chan error)
+	// go func() { msgLoopErrCh <- RunMsgLoop(ctx, rw, map[uint32]MsgHandler{0: &clientMsgH}) }()
+
+	// select {
+	// case err := <-msgLoopErrCh:
+	// 	fmt.Println("error:", err)
+	// case <-ctx.Done():
+	// }
+
+	// stdinFd := int(os.Stdin.Fd())
+
+	// if term.IsTerminal(stdinFd) {
+	// 	state, err := term.MakeRaw(stdinFd)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	defer term.Restore(stdinFd, state)
+	// }
+
+	// // pty.Open()
+
+	// return nil
 }

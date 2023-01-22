@@ -3,6 +3,6 @@ package internal
 import "fmt"
 
 var (
-	Err      = fmt.Errorf("error")
-	UnexpErr = fmt.Errorf("unexpected")
+	Err        = fmt.Errorf("error")
+	Unexpected = fmt.Errorf("unexpected")
 )

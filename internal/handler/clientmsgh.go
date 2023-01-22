@@ -1,25 +1,48 @@
 package handler
 
 import (
+	"sync/atomic"
+
+	"github.com/djosix/med/internal/helper"
 	pb "github.com/djosix/med/internal/protobuf"
 )
 
-type MsgHandlerImpl struct {
-	msgInCh chan *pb.MedMsg
-}
-
-func (h *MsgHandlerImpl) MsgInCh(msg *pb.MedMsg) chan<- *pb.MedMsg {
-	return h.msgInCh
-}
-
-func (h *MsgHandlerImpl) RunLoop(loop *MsgLoop, msgOutCh chan<- *pb.MedMsg) {
-	panic("not implemented")
-}
-
 type ClientMsgHandler struct {
-	MsgHandlerImpl
+	MedProcessorImpl
+	loop       *helper.ValCond[*MedLoop]
+	isTermUsed int32
 }
 
-func (h *ClientMsgHandler) RunLoop(loop *MsgLoop, msgOutCh chan<- *pb.MedMsg) {
+func NewClientMsgHandler() *ClientMsgHandler {
+	var loop *MedLoop = nil
+	return &ClientMsgHandler{
+		loop:       helper.NewValCond(loop),
+		isTermUsed: 0,
+	}
+}
 
+func (h *ClientMsgHandler) RunLoop(loop *MedLoop, msgOutCh chan<- *pb.MedMsg) {
+	// check
+	{
+		if h.loop.IsNot(nil) {
+			panic("loop is already running")
+		}
+		h.loop.Set(loop)
+		defer h.loop.Set(nil)
+	}
+
+	for {
+
+	}
+}
+
+func (h *ClientMsgHandler) StartShell() {
+	// check
+	{
+		if atomic.AddInt32(&h.isTermUsed, 1) != 1 {
+			panic("cannot start shell when terminal is being used")
+		}
+		defer atomic.StoreInt32(&h.isTermUsed, 0)
+		h.loop.WaitNotEq(nil)
+	}
 }

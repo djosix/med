@@ -12,55 +12,67 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type MsgHandler interface {
+type MedProcessor interface {
 	MsgInCh() chan<- *pb.MedMsg
-	RunLoop(loop *MsgLoop, msgOutCh chan<- *pb.MedMsg)
+	RunLoop(loop *MedLoop, msgOutCh chan<- *pb.MedMsg)
 }
 
-type MsgLoop struct {
-	lastMsgHandlerID uint32
-	msgHandlers      map[uint32]MsgHandler
-	msgHandlersMu    sync.Mutex
-	pktInCh          chan *pb.MedPkt
-	pktOutCh         chan *pb.MedPkt
-	wg               sync.WaitGroup
-	f                readwriter.FrameReadWriter
-	ctx              context.Context
-	cancel           context.CancelFunc
+type MedProcessorImpl struct {
+	msgInCh chan *pb.MedMsg
 }
 
-func RunMsgLoop(ctx context.Context, rw io.ReadWriter, msgHandlers map[uint32]MsgHandler) error {
-	if len(msgHandlers) == 0 {
-		panic("must have at least one msgHandler")
-	}
+func (h *MedProcessorImpl) MsgInCh() chan<- *pb.MedMsg {
+	return h.msgInCh
+}
+
+func (h *MedProcessorImpl) RunLoop(loop *MedLoop, msgOutCh chan<- *pb.MedMsg) {
+	panic("not implemented")
+}
+
+type MsgLoop interface {
+	Run()                        // Run the loop
+	Start(h MedProcessor) uint32 // Start a MedProcessor
+	Remove(id uint32) bool       // Remove a MedProcessor
+	Done() <-chan struct{}       // Get the done chan of ctx
+	Cancel()                     // Get the canceller of ctx
+}
+
+type MedLoop struct {
+	lastProcID uint32
+	procs      map[uint32]MedProcessor
+	procsMut   sync.Mutex
+	pktInCh    chan *pb.MedPkt
+	pktOutCh   chan *pb.MedPkt
+	wg         sync.WaitGroup
+	frameRw    readwriter.FrameReadWriter
+	ctx        context.Context
+	cancel     context.CancelFunc
+}
+
+func NewMedLoop(ctx context.Context, rw io.ReadWriter) *MedLoop {
+	var frameRw readwriter.FrameReadWriter
+	frameRw = readwriter.NewPlainFrameReadWriter(rw)
+	frameRw = readwriter.NewSnappyFrameReadWriter(frameRw) // compress frames
 
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithCancel(ctx)
 
-	loop := &MsgLoop{
-		lastMsgHandlerID: 0,
-		msgHandlers:      msgHandlers,
-		msgHandlersMu:    sync.Mutex{},
-		pktInCh:          make(chan *pb.MedPkt),
-		pktOutCh:         make(chan *pb.MedPkt),
-		wg:               sync.WaitGroup{},
-		f:                readwriter.NewPlainFrameReadWriter(rw),
-		ctx:              ctx,
-		cancel:           cancel,
+	loop := &MedLoop{
+		lastProcID: 0,
+		procs:      map[uint32]MedProcessor{},
+		procsMut:   sync.Mutex{},
+		pktInCh:    make(chan *pb.MedPkt),
+		pktOutCh:   make(chan *pb.MedPkt),
+		wg:         sync.WaitGroup{},
+		frameRw:    frameRw,
+		ctx:        ctx,
+		cancel:     cancel,
 	}
 
-	for id, h := range msgHandlers {
-		loop.wg.Add(1)
-		go func(h MsgHandler, id uint32) {
-			defer loop.wg.Done()
-			h.RunLoop(loop, loop.createMsgOutCh(id))
-		}(h, id)
-	}
-
-	return loop.runAllLoops()
+	return loop
 }
 
-func (loop *MsgLoop) createMsgOutCh(handlerID uint32) chan<- *pb.MedMsg {
+func (loop *MedLoop) createMsgOutCh(procID uint32) chan<- *pb.MedMsg {
 	msgOutCh := make(chan *pb.MedMsg, 1)
 	loop.wg.Add(1)
 	go func() {
@@ -75,8 +87,8 @@ func (loop *MsgLoop) createMsgOutCh(handlerID uint32) chan<- *pb.MedMsg {
 			}
 
 			pkt := &pb.MedPkt{
-				SourceId: handlerID,
-				TargetId: handlerID,
+				SourceId: procID,
+				TargetId: procID,
 				Message:  msg,
 			}
 
@@ -90,44 +102,15 @@ func (loop *MsgLoop) createMsgOutCh(handlerID uint32) chan<- *pb.MedMsg {
 	return msgOutCh
 }
 
-func (loop *MsgLoop) CreateMsgHandler(h MsgHandler) uint32 {
-	loop.msgHandlersMu.Lock()
-	defer loop.msgHandlersMu.Unlock()
-
-	loop.lastMsgHandlerID++
-	newID := loop.lastMsgHandlerID
-	loop.msgHandlers[newID] = h
-	return newID
-}
-
-func (loop *MsgLoop) DeleteMsgHandler(id uint32) bool {
-	loop.msgHandlersMu.Lock()
-	defer loop.msgHandlersMu.Unlock()
-
-	if _, ok := loop.msgHandlers[id]; ok {
-		delete(loop.msgHandlers, id)
-		return true
-	}
-	return false
-}
-
-func (loop *MsgLoop) Done() <-chan struct{} {
-	return loop.ctx.Done()
-}
-
-func (loop *MsgLoop) Cancel() {
-	loop.cancel()
-}
-
-func (loop *MsgLoop) runAllLoops() error {
+func (loop *MedLoop) Run() {
 	loopFuncs := []func(){
 		loop.readLoop,
 		loop.dispatchLoop,
 		loop.writeLoop,
 	}
+	loop.wg.Add(len(loopFuncs))
 	for i := range loopFuncs {
 		loopFunc := loopFuncs[i]
-		loop.wg.Add(1)
 		go func() {
 			defer loop.wg.Done()
 			defer loop.cancel()
@@ -135,12 +118,49 @@ func (loop *MsgLoop) runAllLoops() error {
 		}()
 	}
 	loop.wg.Wait()
-	return nil
 }
 
-func (loop *MsgLoop) readLoop() {
+func (loop *MedLoop) Done() <-chan struct{} {
+	return loop.ctx.Done()
+}
+
+func (loop *MedLoop) Cancel() {
+	loop.cancel()
+}
+
+func (loop *MedLoop) Start(p MedProcessor) (procID uint32) {
+	loop.procsMut.Lock()
+	defer loop.procsMut.Unlock()
+
+	loop.lastProcID++
+	procID = loop.lastProcID
+	loop.procs[procID] = p
+
+	loop.wg.Add(1)
+	go func() {
+		p.RunLoop(loop, loop.createMsgOutCh(procID))
+		loop.wg.Done()
+	}()
+
+	return
+}
+
+func (loop *MedLoop) Remove(procID uint32) (ok bool) {
+	loop.procsMut.Lock()
+	defer loop.procsMut.Unlock()
+
+	_, ok = loop.procs[procID]
+	if !ok {
+		return
+	}
+
+	delete(loop.procs, procID)
+	return
+}
+
+func (loop *MedLoop) readLoop() {
 	for {
-		frame, err := loop.f.ReadFrame()
+		frame, err := loop.frameRw.ReadFrame()
 		if err != nil {
 			log.Println("cannot read frame:", err)
 			return
@@ -154,7 +174,7 @@ func (loop *MsgLoop) readLoop() {
 	}
 }
 
-func (loop *MsgLoop) dispatchLoop() {
+func (loop *MedLoop) dispatchLoop() {
 	for {
 		select {
 		case inPkt := <-loop.pktInCh:
@@ -178,11 +198,11 @@ func (loop *MsgLoop) dispatchLoop() {
 	}
 }
 
-func (loop *MsgLoop) dispatchToHandler(pkt *pb.MedPkt) error {
-	loop.msgHandlersMu.Lock()
-	defer loop.msgHandlersMu.Unlock()
+func (loop *MedLoop) dispatchToHandler(pkt *pb.MedPkt) error {
+	loop.procsMut.Lock()
+	defer loop.procsMut.Unlock()
 
-	h, ok := loop.msgHandlers[pkt.TargetId]
+	h, ok := loop.procs[pkt.TargetId]
 	if !ok {
 		return internal.Err
 	}
@@ -197,7 +217,7 @@ func (loop *MsgLoop) dispatchToHandler(pkt *pb.MedPkt) error {
 	return nil
 }
 
-func (loop *MsgLoop) writeLoop() {
+func (loop *MedLoop) writeLoop() {
 	for {
 		select {
 		case msg := <-loop.pktOutCh:
@@ -210,7 +230,7 @@ func (loop *MsgLoop) writeLoop() {
 				panic("cannot marshal MedPkt")
 			}
 
-			err = loop.f.WriteFrame(buf)
+			err = loop.frameRw.WriteFrame(buf)
 			if err != nil {
 				log.Println(err)
 				return

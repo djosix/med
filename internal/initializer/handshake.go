@@ -49,17 +49,13 @@ var (
 )
 
 func Handshake(rw io.ReadWriter, privateKey ed25519.PrivateKey, trustedPublicKeys []ed25519.PublicKey) ([]byte, error) {
-	f := readwriter.NewOrderedFramReadWriter(readwriter.NewPlainFrameReadWriter(rw))
+	f := readwriter.NewPlainFrameReadWriter(rw)
 
 	var localReq pb.KexReq
 	{
 		localReq.Nonce = make([]byte, 32)
-		n, err := rand.Read(localReq.Nonce)
-		if err != nil {
+		if _, err := rand.Read(localReq.Nonce); err != nil {
 			return nil, err
-		}
-		if n != len(localReq.Nonce) {
-			return nil, internal.UnexpErr
 		}
 
 		localReq.PublicKeyHash = helper.HashSalt256(
@@ -71,10 +67,6 @@ func Handshake(rw io.ReadWriter, privateKey ed25519.PrivateKey, trustedPublicKey
 		body = append(body, localReq.Nonce...)
 		body = append(body, localReq.PublicKeyHash...)
 		localReq.Signature = ed25519.Sign(privateKey, body)
-
-		// fmt.Println("localReq.Nonce:", hex.EncodeToString(localReq.Nonce))
-		// fmt.Println("localReq.Signature:", hex.EncodeToString(localReq.Signature))
-		// fmt.Println("localReq.PublicKeyHash:", hex.EncodeToString(localReq.PublicKeyHash))
 
 		data, err := proto.Marshal(&localReq)
 		fmt.Println("localReq size:", len(data))
@@ -101,10 +93,6 @@ func Handshake(rw io.ReadWriter, privateKey ed25519.PrivateKey, trustedPublicKey
 		if err := proto.Unmarshal(data, &remoteReq); err != nil {
 			return nil, fmt.Errorf("cannot unmarshal remoteReq: %w", err)
 		}
-
-		// fmt.Println("remoteReq.Nonce:", hex.EncodeToString(remoteReq.Nonce))
-		// fmt.Println("remoteReq.Signature:", hex.EncodeToString(remoteReq.Signature))
-		// fmt.Println("remoteReq.PublicKeyHash:", hex.EncodeToString(remoteReq.PublicKeyHash))
 
 		var invalid = false
 		invalid = invalid || len(remoteReq.Nonce) != len(localReq.Nonce)
@@ -143,7 +131,7 @@ func Handshake(rw io.ReadWriter, privateKey ed25519.PrivateKey, trustedPublicKey
 	{
 		kexPublicKey, ok := kexPublicKey.([32]byte)
 		if !ok {
-			panic(internal.UnexpErr)
+			panic(internal.Unexpected)
 		}
 		localResp.Nonce = remoteReq.Nonce
 		localResp.KexPublicKey = kexPublicKey[:]
