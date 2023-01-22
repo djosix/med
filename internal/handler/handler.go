@@ -18,7 +18,7 @@ func BindInitializers(h Handler, inits ...initializer.Initializer) Handler {
 				return err
 			}
 		}
-		log.Println("Initializers done")
+		log.Println("initialized")
 		return h(ctx, rw)
 	}
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/djosix/med/internal"
 	"github.com/djosix/med/internal/initializer"
+	"github.com/djosix/med/internal/worker"
 	"github.com/spf13/cobra"
 )
 
@@ -82,8 +83,6 @@ func ClientMain(cmd *cobra.Command, args []string) {
 }
 
 func ClientStart(ctx context.Context, opts *ClientOpts) error {
-	log.Println("ClientStart")
-
 	handler := ClientHandler
 	{
 		inits := []initializer.Initializer{
@@ -114,36 +113,10 @@ func ClientStart(ctx context.Context, opts *ClientOpts) error {
 }
 
 func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
-	// clientMsgH := ClientMsgHandler{}
 
-	var loop MsgLoop = NewMedLoop(ctx, rw)
-	// loop.AddHandler()
+	var loop worker.Loop = worker.NewLoop(ctx, rw)
+	// loop.Start(&worker.ProcImpl{})
 	loop.Run()
 
 	return nil
-
-	// clientMsgH := ClientMsgHandler{}
-
-	// msgLoopErrCh := make(chan error)
-	// go func() { msgLoopErrCh <- RunMsgLoop(ctx, rw, map[uint32]MsgHandler{0: &clientMsgH}) }()
-
-	// select {
-	// case err := <-msgLoopErrCh:
-	// 	fmt.Println("error:", err)
-	// case <-ctx.Done():
-	// }
-
-	// stdinFd := int(os.Stdin.Fd())
-
-	// if term.IsTerminal(stdinFd) {
-	// 	state, err := term.MakeRaw(stdinFd)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	defer term.Restore(stdinFd, state)
-	// }
-
-	// // pty.Open()
-
-	// return nil
 }

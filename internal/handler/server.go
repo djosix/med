@@ -8,6 +8,7 @@ import (
 
 	"github.com/djosix/med/internal"
 	"github.com/djosix/med/internal/initializer"
+	"github.com/djosix/med/internal/worker"
 
 	"github.com/spf13/cobra"
 )
@@ -115,27 +116,10 @@ func ServerStart(ctx context.Context, opts *ServerOpts) error {
 
 func ServerHandler(ctx context.Context, rw io.ReadWriter) error {
 
-	// handlers := map[uint32]MsgHandler{}
-	// return RunMsgLoop(ctx, rw, handlers)
+	var loop worker.Loop = worker.NewLoop(ctx, rw)
+	loop.Run()
 
-	_ = ctx
-
-	time.Sleep(time.Duration(2) * time.Second)
-
-	data := []byte("ServerMessage\n")
-	log.Println("Write:", string(data))
-	n, err := rw.Write(data)
-	if err != nil {
-		return err
-	}
-
-	buf := make([]byte, 1024)
-	n, err = rw.Read(buf)
-	if err != nil {
-		return err
-	}
-	log.Println("Read:", n, err, string(buf))
-	log.Println("End")
+	log.Println("ServerHandler END")
 
 	return nil
 }

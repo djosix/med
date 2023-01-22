@@ -15,7 +15,7 @@ import (
 
 func InitEncryption(secret []byte) Initializer {
 	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		log.Println("InitEncryption")
+		log.Println("init: enable encryption")
 
 		secret := secret
 		if secret == nil {

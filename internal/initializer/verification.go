@@ -14,7 +14,7 @@ import (
 
 func InitVerify(hash []byte) Initializer {
 	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		log.Println("InitVerifyClient")
+		log.Println("init: verify")
 
 		ctxOut = ctx
 		rwOut = rw
@@ -26,7 +26,7 @@ func InitVerify(hash []byte) Initializer {
 
 func InitGetVerified(hash []byte) Initializer {
 	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		log.Println("InitGetVerified")
+		log.Println("init: get verified")
 
 		ctxOut = ctx
 		rwOut = rw

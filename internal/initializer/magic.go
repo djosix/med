@@ -12,7 +12,7 @@ import (
 
 func InitCheckMagic(sendMagic, recvMagic []byte) Initializer {
 	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		log.Println("InitCheckMagic")
+		log.Println("init: check magic")
 
 		ctxOut = ctx
 		rwOut = rw

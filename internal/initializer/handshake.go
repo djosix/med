@@ -6,7 +6,6 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	_ "embed"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -21,7 +20,7 @@ import (
 
 func InitHandshake(privateKey ed25519.PrivateKey, trustedPublicKeys []ed25519.PublicKey) Initializer {
 	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		log.Println("InitHandshake")
+		log.Println("init: kex handshake")
 
 		sharedSecret, err := Handshake(rw, privateKey, trustedPublicKeys)
 		if err != nil {
@@ -69,8 +68,6 @@ func Handshake(rw io.ReadWriter, privateKey ed25519.PrivateKey, trustedPublicKey
 		localReq.Signature = ed25519.Sign(privateKey, body)
 
 		data, err := proto.Marshal(&localReq)
-		fmt.Println("localReq size:", len(data))
-		fmt.Println("localReq hash:", hex.EncodeToString(helper.Hash256(data))[:8])
 		if err != nil {
 			return nil, fmt.Errorf("cannot marshal localReq")
 		}
@@ -84,8 +81,6 @@ func Handshake(rw io.ReadWriter, privateKey ed25519.PrivateKey, trustedPublicKey
 	var remoteReq pb.KexReq
 	{
 		data, err := f.ReadFrame()
-		fmt.Println("remoteReq size:", len(data))
-		fmt.Println("remoteReq hash:", hex.EncodeToString(helper.Hash256(data))[:8])
 		if err != nil {
 			return nil, fmt.Errorf("cannot read remoteReq frame: %w", err)
 		}
@@ -145,8 +140,6 @@ func Handshake(rw io.ReadWriter, privateKey ed25519.PrivateKey, trustedPublicKey
 		if err != nil {
 			return nil, fmt.Errorf("cannot marshal localResp: %w", err)
 		}
-		fmt.Println("localResp size:", len(data))
-		fmt.Println("localResp hash:", hex.EncodeToString(helper.Hash256(data))[:8])
 		if err := f.WriteFrame(data); err != nil {
 			return nil, fmt.Errorf("cannot write localResp frame: %w", err)
 		}
@@ -158,8 +151,6 @@ func Handshake(rw io.ReadWriter, privateKey ed25519.PrivateKey, trustedPublicKey
 		if err != nil {
 			return nil, fmt.Errorf("cannot read remoteResp frame")
 		}
-		fmt.Println("remoteResp size:", len(data))
-		fmt.Println("remoteResp hash:", hex.EncodeToString(helper.Hash256(data))[:8])
 		if err := proto.Unmarshal(data, &remoteResp); err != nil {
 			return nil, fmt.Errorf("cannot unmarshal remoteResp: %w", err)
 		}

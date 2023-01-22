@@ -1,4 +1,4 @@
-package handler
+package worker
 
 import (
 	"context"
@@ -12,34 +12,17 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type MedProcessor interface {
-	MsgInCh() chan<- *pb.MedMsg
-	RunLoop(loop *MedLoop, msgOutCh chan<- *pb.MedMsg)
+type Loop interface {
+	Run()                  // Run the loop
+	Start(h Proc) uint32   // Start a MedProc
+	Remove(id uint32) bool // Remove a MedProc
+	Done() <-chan struct{} // Get the done chan of ctx
+	Cancel()               // Get the canceller of ctx
 }
 
-type MedProcessorImpl struct {
-	msgInCh chan *pb.MedMsg
-}
-
-func (h *MedProcessorImpl) MsgInCh() chan<- *pb.MedMsg {
-	return h.msgInCh
-}
-
-func (h *MedProcessorImpl) RunLoop(loop *MedLoop, msgOutCh chan<- *pb.MedMsg) {
-	panic("not implemented")
-}
-
-type MsgLoop interface {
-	Run()                        // Run the loop
-	Start(h MedProcessor) uint32 // Start a MedProcessor
-	Remove(id uint32) bool       // Remove a MedProcessor
-	Done() <-chan struct{}       // Get the done chan of ctx
-	Cancel()                     // Get the canceller of ctx
-}
-
-type MedLoop struct {
+type LoopImpl struct {
 	lastProcID uint32
-	procs      map[uint32]MedProcessor
+	procs      map[uint32]Proc
 	procsMut   sync.Mutex
 	pktInCh    chan *pb.MedPkt
 	pktOutCh   chan *pb.MedPkt
@@ -49,7 +32,7 @@ type MedLoop struct {
 	cancel     context.CancelFunc
 }
 
-func NewMedLoop(ctx context.Context, rw io.ReadWriter) *MedLoop {
+func NewLoop(ctx context.Context, rw io.ReadWriter) *LoopImpl {
 	var frameRw readwriter.FrameReadWriter
 	frameRw = readwriter.NewPlainFrameReadWriter(rw)
 	frameRw = readwriter.NewSnappyFrameReadWriter(frameRw) // compress frames
@@ -57,9 +40,9 @@ func NewMedLoop(ctx context.Context, rw io.ReadWriter) *MedLoop {
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithCancel(ctx)
 
-	loop := &MedLoop{
+	loop := &LoopImpl{
 		lastProcID: 0,
-		procs:      map[uint32]MedProcessor{},
+		procs:      map[uint32]Proc{},
 		procsMut:   sync.Mutex{},
 		pktInCh:    make(chan *pb.MedPkt),
 		pktOutCh:   make(chan *pb.MedPkt),
@@ -72,7 +55,7 @@ func NewMedLoop(ctx context.Context, rw io.ReadWriter) *MedLoop {
 	return loop
 }
 
-func (loop *MedLoop) createMsgOutCh(procID uint32) chan<- *pb.MedMsg {
+func (loop *LoopImpl) createMsgOutCh(procID uint32) chan<- *pb.MedMsg {
 	msgOutCh := make(chan *pb.MedMsg, 1)
 	loop.wg.Add(1)
 	go func() {
@@ -102,7 +85,7 @@ func (loop *MedLoop) createMsgOutCh(procID uint32) chan<- *pb.MedMsg {
 	return msgOutCh
 }
 
-func (loop *MedLoop) Run() {
+func (loop *LoopImpl) Run() {
 	loopFuncs := []func(){
 		loop.readLoop,
 		loop.dispatchLoop,
@@ -120,15 +103,15 @@ func (loop *MedLoop) Run() {
 	loop.wg.Wait()
 }
 
-func (loop *MedLoop) Done() <-chan struct{} {
+func (loop *LoopImpl) Done() <-chan struct{} {
 	return loop.ctx.Done()
 }
 
-func (loop *MedLoop) Cancel() {
+func (loop *LoopImpl) Cancel() {
 	loop.cancel()
 }
 
-func (loop *MedLoop) Start(p MedProcessor) (procID uint32) {
+func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 	loop.procsMut.Lock()
 	defer loop.procsMut.Unlock()
 
@@ -138,14 +121,14 @@ func (loop *MedLoop) Start(p MedProcessor) (procID uint32) {
 
 	loop.wg.Add(1)
 	go func() {
-		p.RunLoop(loop, loop.createMsgOutCh(procID))
+		p.Run(loop, loop.createMsgOutCh(procID))
 		loop.wg.Done()
 	}()
 
 	return
 }
 
-func (loop *MedLoop) Remove(procID uint32) (ok bool) {
+func (loop *LoopImpl) Remove(procID uint32) (ok bool) {
 	loop.procsMut.Lock()
 	defer loop.procsMut.Unlock()
 
@@ -158,7 +141,7 @@ func (loop *MedLoop) Remove(procID uint32) (ok bool) {
 	return
 }
 
-func (loop *MedLoop) readLoop() {
+func (loop *LoopImpl) readLoop() {
 	for {
 		frame, err := loop.frameRw.ReadFrame()
 		if err != nil {
@@ -174,7 +157,7 @@ func (loop *MedLoop) readLoop() {
 	}
 }
 
-func (loop *MedLoop) dispatchLoop() {
+func (loop *LoopImpl) dispatchLoop() {
 	for {
 		select {
 		case inPkt := <-loop.pktInCh:
@@ -198,7 +181,7 @@ func (loop *MedLoop) dispatchLoop() {
 	}
 }
 
-func (loop *MedLoop) dispatchToHandler(pkt *pb.MedPkt) error {
+func (loop *LoopImpl) dispatchToHandler(pkt *pb.MedPkt) error {
 	loop.procsMut.Lock()
 	defer loop.procsMut.Unlock()
 
@@ -217,7 +200,7 @@ func (loop *MedLoop) dispatchToHandler(pkt *pb.MedPkt) error {
 	return nil
 }
 
-func (loop *MedLoop) writeLoop() {
+func (loop *LoopImpl) writeLoop() {
 	for {
 		select {
 		case msg := <-loop.pktOutCh:
