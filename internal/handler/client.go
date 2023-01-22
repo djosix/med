@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 
@@ -117,8 +118,17 @@ func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
 	defer log.Println("ClientHandler END")
 
 	var loop worker.Loop = worker.NewLoop(ctx, rw)
-	loop.Start(worker.NewExampleProc("this is a message from med client"))
+	loop.Start(worker.NewExampleProc("message from client"))
 	loop.Run()
+
+	{
+		buf := []byte("client loop closed")
+		if _, err := rw.Write(buf); err == nil {
+			if n, err := rw.Read(buf); err == nil {
+				fmt.Println("remote:", string(buf[:n]))
+			}
+		}
+	}
 
 	return nil
 }

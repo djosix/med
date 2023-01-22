@@ -2,32 +2,68 @@ syntax = "proto3";
 package proto;
 option go_package = "./internal/protobuf";
 
+
 message KexReq {
-    bytes nonce = 1;
-    bytes public_key_hash = 2;
-    bytes signature = 3;
+    bytes Nonce = 1;
+    bytes PublicKeyHash = 2;
+    bytes Signature = 3;
 }
 
 message KexResp {
-    bytes nonce = 1;
-    bytes kex_public_key = 2;
-    bytes signature = 3;
+    bytes Nonce = 1;
+    bytes KexPublicKey = 2;
+    bytes Signature = 3;
 }
+
 
 message MedPkt {
-    uint32 target_id = 1;
-    uint32 source_id = 2;
-    MedMsg message = 3;
+    uint32 TargetID = 1;
+    uint32 SourceID = 2;
+    MedMsg Message = 3;
 }
 
+
 message MedMsg {
-    MedMsgType type = 1;
-    bytes content = 2;
+    MedMsgType Type = 1;
+    bytes Content = 2;
 }
 
 enum MedMsgType {
-    META = 0;
-    CTRL = 1;
-    DATA = 2;
-    ERROR = 3;
+    MedMsgTypeNone = 0;
+    MedMsgTypeControl = 1;
+    MedMsgTypeData = 2;
+    MedMsgTypeError = 3;
 }
+
+
+message MedMainMsg {
+    oneof inner {
+        MedMainStartReq StartReq = 11;
+        MedMainStartResp StartResp = 12;
+        MedMainRemoveReq RemoveReq = 21;
+        MedMainRemoveResp RemoveResp = 22;
+    }
+}
+
+enum MedProcType {
+    MedProcTypeNone = 0;
+    MedProcTypeExample = 1;
+}
+
+message MedMainStartReq {
+    MedProcType Type = 1;
+}
+
+message MedMainStartResp {
+    uint32 ProcID = 1;
+}
+
+
+message MedMainRemoveReq {
+    uint32 ProcID = 1;
+}
+
+message MedMainRemoveResp {
+    bool Ok = 1;
+}
+

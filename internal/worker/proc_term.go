@@ -6,35 +6,27 @@ import (
 	pb "github.com/djosix/med/internal/protobuf"
 )
 
-type ClientTermProc struct {
-	ProcImpl
-}
+type ClientTermProc struct{}
 
 func NewClientTermProc() *ClientTermProc {
-	return &ClientTermProc{
-		ProcImpl: NewProcImpl(0),
-	}
+	return &ClientTermProc{}
 }
 
-func (p *ClientTermProc) Run(loop *LoopImpl, msgOutCh chan<- *pb.MedMsg) {
+func (p *ClientTermProc) Run(ctx ProcRunCtx) {
 	fmt.Println("Run 1")
-	msgOutCh <- &pb.MedMsg{
-		Type:    pb.MedMsgType_DATA,
+	ctx.MsgOutCh <- &pb.MedMsg{
+		Type:    pb.MedMsgType_MedMsgTypeData,
 		Content: []byte("Message from ClientTermProc"),
 	}
 	fmt.Println("Run 2")
-	fmt.Println(<-p.msgInCh)
+	fmt.Println(<-ctx.MsgInCh)
 	fmt.Println("Run 3")
 }
 
-type ServerTermProc struct {
-	ProcImpl
-}
+type ServerTermProc struct{}
 
 func NewServerTermProc() *ServerTermProc {
-	return &ServerTermProc{
-		ProcImpl: NewProcImpl(0),
-	}
+	return &ServerTermProc{}
 }
 
 func (p *ServerTermProc) Run(loop *LoopImpl, msgOutCh chan<- *pb.MedMsg) {

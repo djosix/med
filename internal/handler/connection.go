@@ -38,6 +38,7 @@ func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) 
 				defer conn.Close()
 				log.Println("accept:", conn.RemoteAddr())
 
+				ctx := context.WithValue(ctx, "conn", conn)
 				if err := handler(ctx, conn); err != nil {
 					log.Println("error:", conn.RemoteAddr(), err)
 				}
@@ -57,6 +58,7 @@ func Connect(ctx context.Context, endpoint string, handler Handler) error {
 	}
 	defer conn.Close()
 
+	ctx = context.WithValue(ctx, "conn", conn)
 	err = handler(ctx, conn)
 	if err != nil {
 		return err

@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"sync"
 	"time"
 
+	"github.com/djosix/med/internal/helper"
 	pb "github.com/djosix/med/internal/protobuf"
 	"github.com/djosix/med/internal/readwriter"
 	"google.golang.org/protobuf/proto"
@@ -28,14 +30,21 @@ type Loop interface {
 
 type LoopImpl struct {
 	lastProcID uint32
-	procs      map[uint32]Proc
-	procsLock  sync.Mutex
+	procData   map[uint32]loopProcInfo
+	procLock   sync.Mutex
 	pktInCh    chan *pb.MedPkt
 	pktOutCh   chan *pb.MedPkt
 	wg         sync.WaitGroup
 	frameRw    readwriter.FrameReadWriter
 	ctx        context.Context
 	cancel     context.CancelFunc
+}
+
+type loopProcInfo struct {
+	proc    Proc
+	ctx     context.Context
+	cancel  context.CancelFunc
+	msgInCh chan *pb.MedMsg
 }
 
 func NewLoop(ctx context.Context, rw io.ReadWriter) *LoopImpl {
@@ -46,10 +55,10 @@ func NewLoop(ctx context.Context, rw io.ReadWriter) *LoopImpl {
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithCancel(ctx)
 
-	loop := &LoopImpl{
+	return &LoopImpl{
 		lastProcID: 0,
-		procs:      map[uint32]Proc{},
-		procsLock:  sync.Mutex{},
+		procData:   map[uint32]loopProcInfo{},
+		procLock:   sync.Mutex{},
 		pktInCh:    make(chan *pb.MedPkt),
 		pktOutCh:   make(chan *pb.MedPkt),
 		wg:         sync.WaitGroup{},
@@ -57,98 +66,118 @@ func NewLoop(ctx context.Context, rw io.ReadWriter) *LoopImpl {
 		ctx:        ctx,
 		cancel:     cancel,
 	}
-
-	return loop
 }
 
-func (loop *LoopImpl) createMsgOutCh(procID uint32) chan<- *pb.MedMsg {
+func (loop *LoopImpl) Run() {
+	for _, loopFunc := range []func(){
+		loop.loopRead,
+		loop.loopDispatch,
+		loop.loopWrite,
+	} {
+		loopFunc := loopFunc
+		loop.wg.Add(1)
+		go func() {
+			defer loop.wg.Done()
+			defer loop.Cancel() // stop all other loops after any loop ends
+			loopFunc()
+		}()
+	}
+	loop.wg.Wait()
+
+	if conn, ok := loop.ctx.Value("conn").(net.Conn); ok {
+		helper.RefreshConnRW(conn)
+	} else {
+		panic("cannot find conn in ctx")
+	}
+}
+
+func (loop *LoopImpl) Start(p Proc) (procID uint32) {
+	loop.procLock.Lock()
+	defer loop.procLock.Unlock()
+
+	procID = loop.lastProcID + 1
+	loop.lastProcID = procID
+
+	ctx, cancel := context.WithCancel(loop.ctx)
+	ctx = context.WithValue(loop.ctx, "procID", procID)
+
+	msgInCh := make(chan *pb.MedMsg)
 	msgOutCh := make(chan *pb.MedMsg, 1)
+
 	loop.wg.Add(1)
 	go func() {
 		defer loop.wg.Done()
 		for {
 			var msg *pb.MedMsg
-
 			select {
 			case msg = <-msgOutCh:
-			case <-loop.ctx.Done():
+			case <-ctx.Done():
 				return
 			}
-
 			pkt := &pb.MedPkt{
-				SourceId: procID,
-				TargetId: procID,
+				SourceID: procID,
+				TargetID: procID,
 				Message:  msg,
 			}
-
 			select {
 			case loop.pktOutCh <- pkt:
-			case <-loop.ctx.Done():
+			case <-ctx.Done():
 				return
 			}
 		}
 	}()
-	return msgOutCh
+
+	loop.procData[procID] = loopProcInfo{
+		proc:    p,
+		ctx:     ctx,
+		cancel:  cancel,
+		msgInCh: msgInCh,
+	}
+
+	loop.wg.Add(1)
+	go func() {
+		defer loop.wg.Done()
+		runCtx := ProcRunCtx{
+			Context:  ctx,
+			Cancel:   cancel,
+			Loop:     loop,
+			MsgInCh:  msgInCh,
+			MsgOutCh: msgOutCh,
+		}
+		p.Run(runCtx)
+	}()
+
+	return
 }
 
-func (loop *LoopImpl) Run() {
-	loopFuncs := []func(){
-		loop.readLoop,
-		loop.dispatchLoop,
-		loop.writeLoop,
+func (loop *LoopImpl) Remove(procID uint32) bool {
+	loop.procLock.Lock()
+	defer loop.procLock.Unlock()
+
+	p, ok := loop.procData[procID]
+	if ok {
+		delete(loop.procData, procID)
+		p.cancel()
 	}
-	loop.wg.Add(len(loopFuncs))
-	for i := range loopFuncs {
-		loopFunc := loopFuncs[i]
-		go func() {
-			defer loop.wg.Done()
-			defer loop.cancel()
-			loopFunc()
-		}()
-	}
-	loop.wg.Wait()
+	return ok
 }
 
 func (loop *LoopImpl) Done() <-chan struct{} {
 	return loop.ctx.Done()
 }
 
-func (loop *LoopImpl) Start(p Proc) (procID uint32) {
-	loop.procsLock.Lock()
-	defer loop.procsLock.Unlock()
-
-	procID = loop.lastProcID + 1
-	loop.lastProcID = procID
-	loop.procs[procID] = p
-
-	loop.wg.Add(1)
-	go func() {
-		p.Run(loop, loop.createMsgOutCh(procID))
-		loop.wg.Done()
-	}()
-
-	return
-}
-
-func (loop *LoopImpl) Remove(procID uint32) (ok bool) {
-	loop.procsLock.Lock()
-	defer loop.procsLock.Unlock()
-
-	_, ok = loop.procs[procID]
-	if !ok {
-		return
-	}
-
-	delete(loop.procs, procID)
-	return
-}
-
 func (loop *LoopImpl) Cancel() {
 	loop.cancel()
+
+	if conn, ok := loop.ctx.Value("conn").(net.Conn); ok {
+		helper.BreakConnRW(conn)
+	} else {
+		panic("cannot find conn in ctx")
+	}
 }
 
-func (loop *LoopImpl) readLoop() {
-	defer log.Println("readLoop done")
+func (loop *LoopImpl) loopRead() {
+	defer log.Println("done loopRead")
 	for {
 		frame, err := loop.frameRw.ReadFrame()
 		if err != nil {
@@ -160,7 +189,7 @@ func (loop *LoopImpl) readLoop() {
 			log.Println("cannot unmarshal frame to MedPkt:", err)
 			continue
 		}
-		if inPkt.Message.Type == pb.MedMsgType_ERROR {
+		if inPkt.Message.Type == pb.MedMsgType_MedMsgTypeError {
 			fmt.Println("readLoop:", "got error pkt:", inPkt.String())
 			continue
 		}
@@ -168,23 +197,43 @@ func (loop *LoopImpl) readLoop() {
 	}
 }
 
-func (loop *LoopImpl) dispatchLoop() {
-	defer log.Println("dispatchLoop done")
+func (loop *LoopImpl) loopDispatch() {
+	defer log.Println("done loopDispatch")
+
+	dispatchToProc := func(pkt *pb.MedPkt) error {
+		loop.procLock.Lock()
+		defer loop.procLock.Unlock()
+
+		p, ok := loop.procData[pkt.TargetID]
+		if !ok {
+			return fmt.Errorf("proc not found with ID %v", pkt.TargetID)
+		}
+
+		timeout := time.NewTimer(time.Duration(5) * time.Second)
+
+		select {
+		case p.msgInCh <- pkt.Message:
+		case <-loop.Done():
+			return fmt.Errorf("loop closed")
+		case <-timeout.C:
+			return fmt.Errorf("dispatch timeout")
+		}
+		return nil
+	}
+
 	for {
 		select {
 		case inPkt := <-loop.pktInCh:
 			if inPkt == nil {
-				log.Println("msg from loop.inPktCh is nil")
+				log.Println("MedMsg from loop.inPktCh is nil")
 				return
 			}
-			fmt.Println("dispatchLoop:", "got inPkt", inPkt.String())
-			if err := loop.dispatchToProc(inPkt); err != nil {
-				fmt.Println("dispatchLoop:", "dispatch error:", err)
+			if err := dispatchToProc(inPkt); err != nil {
 				loop.pktOutCh <- &pb.MedPkt{
-					TargetId: inPkt.SourceId,
-					SourceId: inPkt.TargetId,
+					TargetID: inPkt.SourceID,
+					SourceID: inPkt.TargetID,
 					Message: &pb.MedMsg{
-						Type:    pb.MedMsgType_ERROR,
+						Type:    pb.MedMsgType_MedMsgTypeError,
 						Content: []byte(err.Error()),
 					},
 				}
@@ -195,34 +244,13 @@ func (loop *LoopImpl) dispatchLoop() {
 	}
 }
 
-func (loop *LoopImpl) dispatchToProc(pkt *pb.MedPkt) error {
-	loop.procsLock.Lock()
-	defer loop.procsLock.Unlock()
-
-	h, ok := loop.procs[pkt.TargetId]
-	if !ok {
-		return fmt.Errorf("proc not found with ID %v", pkt.TargetId)
-	}
-
-	timeout := time.NewTimer(time.Duration(5) * time.Second)
-
-	select {
-	case h.MsgInCh() <- pkt.Message:
-	case <-loop.Done():
-		return fmt.Errorf("loop closed")
-	case <-timeout.C:
-		return fmt.Errorf("dispatch timeout")
-	}
-	return nil
-}
-
-func (loop *LoopImpl) writeLoop() {
-	defer log.Println("writeLoop done")
+func (loop *LoopImpl) loopWrite() {
+	defer log.Println("done loopWrite")
 	for {
 		select {
 		case msg := <-loop.pktOutCh:
 			if msg == nil {
-				log.Println("msg from loop.outPktCh is nil")
+				log.Println("MedPkt from loop.outPktCh is nil")
 				return
 			}
 			buf, err := proto.Marshal(msg)

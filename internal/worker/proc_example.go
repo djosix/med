@@ -7,26 +7,25 @@ import (
 )
 
 type ExampleProc struct {
-	ProcImpl
 	message string
 }
 
 func NewExampleProc(message string) *ExampleProc {
 	return &ExampleProc{
-		ProcImpl: NewProcImpl(0),
-		message:  message,
+		message: message,
 	}
 }
 
-func (p *ExampleProc) Run(loop *LoopImpl, msgOutCh chan<- *pb.MedMsg) {
-	fmt.Printf("ExampleProc: send %#v\n", p.message)
-	msgOutCh <- &pb.MedMsg{
-		Type:    pb.MedMsgType_DATA,
-		Content: []byte("Message from ServerTermProc"),
+func (p *ExampleProc) Run(ctx ProcRunCtx) {
+	fmt.Printf("ExampleProc: sending %#v\n", p.message)
+	ctx.MsgOutCh <- &pb.MedMsg{
+		Type:    pb.MedMsgType_MedMsgTypeData,
+		Content: []byte(p.message),
 	}
+	fmt.Printf("ExampleProc: waiting for response\n")
 
-	msg := <-p.msgInCh
+	msg := <-ctx.MsgInCh
 	fmt.Printf("ExampleProc: received %#v\n", string(msg.Content))
 
-	loop.Cancel()
+	ctx.Loop.Cancel()
 }

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log"
 	"time"
@@ -82,9 +83,6 @@ func ServerMain(cmd *cobra.Command, args []string) {
 }
 
 func ServerStart(ctx context.Context, opts *ServerOpts) error {
-	log.Println("ServerStart")
-	log.Printf("%#v\n", opts)
-
 	handler := ServerHandler
 	{
 		inits := []initializer.Initializer{
@@ -119,8 +117,17 @@ func ServerHandler(ctx context.Context, rw io.ReadWriter) error {
 	defer log.Println("ServerHandler END")
 
 	var loop worker.Loop = worker.NewLoop(ctx, rw)
-	loop.Start(worker.NewExampleProc("this is a message from med server"))
+	loop.Start(worker.NewExampleProc("message from server"))
 	loop.Run()
+
+	{
+		buf := []byte("server loop closed")
+		if _, err := rw.Write(buf); err == nil {
+			if n, err := rw.Read(buf); err == nil {
+				fmt.Println("remote:", string(buf[:n]))
+			}
+		}
+	}
 
 	return nil
 }
