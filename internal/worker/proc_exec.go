@@ -20,10 +20,11 @@ import (
 ///////////////////////////////////////////////////////////////////////////
 
 const (
-	ExecProcCtrlKindWinSize = 1
+	ProcExecInfoKindWinSize = 1
+	ProcExecCtrlQuit        = "quit"
 )
 
-type ExecProcCtrl struct {
+type ProcExecInfo struct {
 	Kind int
 	Data []byte
 }
@@ -35,21 +36,28 @@ type ClientExecProc struct {
 	stdin       *os.File
 	stdout      *os.File
 	stderr      *os.File
+	argv        []string
 	tty         bool
 }
 
-func NewClientExecProc() *ClientExecProc {
+func NewClientExecProc(argv []string, tty bool) *ClientExecProc {
 	stdinReader, stdin := helper.GetBreakableStdin()
+
 	return &ClientExecProc{
+		stdin:  stdin,
+		stdout: os.Stdout,
+		stderr: os.Stderr,
+
 		stdinReader: stdinReader,
-		stdin:       stdin,
-		stdout:      os.Stdout,
-		stderr:      os.Stderr,
-		tty:         true,
+
+		argv: argv,
+		tty:  tty,
 	}
 }
 
 func (p *ClientExecProc) Run(ctx ProcRunCtx) {
+	// ctx.MsgOutCh <- &pb.MedMsg{
+	// }
 
 	if p.tty {
 		oldState, err := term.MakeRaw(int(p.stdin.Fd()))
@@ -78,9 +86,13 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 
 		wg.Add(1)
 		go func() {
+			logger := logger.NewLogger("loop[SIGWINCH]")
+			logger.Debug("start")
+
 			defer wg.Done()
 			defer ctx.Cancel()
-			defer logger.Print("done SIGWINCH loop")
+			defer logger.Debug("done")
+
 			for {
 				select {
 				case <-sigCh:
@@ -89,26 +101,15 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 				}
 				winSize, err := pty.GetsizeFull(p.stdin)
 				if err != nil {
-					logger.Print("cannot get winSize")
+					logger.Error("cannot get winSize")
 					continue
 				}
-				data, err := helper.Encode(winSize)
-				if err != nil {
-					logger.Print("cannot encode winSize")
-					continue
-				}
-				ctrl := ExecProcCtrl{
-					Kind: ExecProcCtrlKindWinSize,
-					Data: data,
-				}
-				data, err = helper.Encode(ctrl)
-				if err != nil {
-					logger.Print("cannot encode ctrl")
-					continue
-				}
-				ctx.MsgOutCh <- &pb.MedMsg{
-					Type: pb.MedMsgType_MedMsgTypeControl,
-					Data: data,
+				ctx.PktOutCh <- &pb.Packet{
+					Kind: pb.PacketKind_PacketKindInfo,
+					Data: helper.MustEncode(&ProcExecInfo{
+						Kind: ProcExecInfoKindWinSize,
+						Data: helper.MustEncode(winSize),
+					}),
 				}
 			}
 		}()
@@ -117,68 +118,77 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 	// Handle IO
 	wg.Add(1)
 	go func() {
+		logger := logger.NewLogger("loop[ctx.MsgInCh]")
+		logger.Debug("start")
+
 		defer wg.Done()
 		defer localCancel()
-		defer logger.Print("done ctx.MsgInCh loop")
+		defer logger.Debug("done")
+
 		for {
-			var msg *pb.MedMsg
+			var pkt *pb.Packet
 			select {
-			case msg = <-ctx.MsgInCh:
-				if msg == nil {
+			case pkt = <-ctx.PktInCh:
+				if pkt == nil {
 					return // ctx.MsgInCh is closed
 				}
 			case <-localCtx.Done():
 				return
 			}
 
-			switch msg.Type {
-			case pb.MedMsgType_MedMsgTypeControl:
-				if bytes.Equal(msg.Data, []byte("end")) {
+			switch pkt.Kind {
+			case pb.PacketKind_PacketKindCtrl:
+				if bytes.Equal(pkt.Data, []byte(ProcExecCtrlQuit)) {
 					return
 				} else {
-					panic(fmt.Sprintln("unknown MedMsgType_MedMsgTypeControl:", msg.Data))
+					panic(fmt.Sprintln("unknown MedMsgType_MedMsgTypeControl:", pkt.Data))
 				}
-			case pb.MedMsgType_MedMsgTypeData:
-				p.stdout.Write(msg.Data)
+			case pb.PacketKind_PacketKindData:
+				p.stdout.Write(pkt.Data)
 			}
 		}
 	}()
 
 	wg.Add(1)
 	go func() {
+		logger := logger.NewLogger("loop[stdin.Read]")
+		logger.Debug("start")
+
 		defer wg.Done()
 		defer localCancel()
-		defer logger.Print("done stdin read loop")
+		defer logger.Debug("done")
+
 		buf := make([]byte, 1024)
 		for {
 			n, err := p.stdinReader.Read(buf)
 			if err != nil || n == 0 {
-				logger.Print("stdin:", err)
+				logger.Debugf("stdin: n=[%v] err=[%v]", n, err)
 				return
 			}
-			msg := &pb.MedMsg{
-				Type: pb.MedMsgType_MedMsgTypeData,
-				Data: append([]byte{}, buf[:n]...),
+			pkt := &pb.Packet{
+				Kind: pb.PacketKind_PacketKindData,
+				Data: helper.Clone(buf[:n]),
 			}
 			select {
-			case ctx.MsgOutCh <- msg:
+			case ctx.PktOutCh <- pkt:
 			case <-localCtx.Done():
 				return
 			}
-
 		}
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		defer logger.Debug("p.stdinReader.BreakRead()")
+
 		<-localCtx.Done()
 		p.stdinReader.BreakRead()
 	}()
 
 	wg.Wait()
 
-	ctx.Loop.Cancel()
+	ctx.Loop.Stop()
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -190,11 +200,15 @@ func NewServerExecProc() *ServerExecProc {
 }
 
 func (p *ServerExecProc) Run(ctx ProcRunCtx) {
+	logger := logger.NewLogger("ServerExecProc")
+	logger.Debug("start")
+	defer logger.Debug("done")
+
 	c := exec.Command("bash")
 
 	ptmx, err := pty.Start(c)
 	if err != nil {
-		logger.Print("error:", err)
+		logger.Error("pty.Start:", err)
 		return
 	}
 	defer func() { _ = ptmx.Close() }()
@@ -207,8 +221,10 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 
 	wg.Add(1)
 	go func() {
+		logger := logger.NewLogger("ProcessKiller")
+		logger.Debug("start")
 		defer wg.Done()
-		defer logger.Print("done kill")
+		defer logger.Debug("done")
 		<-localCtx.Done()
 		c.Process.Kill()
 		c.Process.Wait()
@@ -216,9 +232,11 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 
 	wg.Add(1)
 	go func() {
+		logger := logger.NewLogger("loop[ptmxIn]")
+		logger.Debug("start")
 		defer wg.Done()
 		defer localCancel()
-		defer logger.Print("done ptmxIn loop")
+		defer logger.Debug("done")
 		for {
 			var buf []byte
 			select {
@@ -239,19 +257,17 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 
 	wg.Add(1)
 	go func() {
+		logger := logger.NewLogger("loop[ptmx.Read]")
+		logger.Debug("start")
 		defer wg.Done()
 		defer localCancel()
 		defer close(ptmxOut)
-		defer logger.Print("done ptmx.Read loop")
+		defer logger.Debug("done")
 		buf := [1024]byte{}
 		for {
 			n, err := ptmx.Read(buf[:])
-			if err != nil {
-				logger.Print("cannot ptmx.Read:", err)
-				return
-			}
-			if n == 0 {
-				logger.Print("empty from ptmx.Read")
+			if err != nil || n == 0 {
+				logger.Debugf("ptmx.Read: n=[%v] err=[%v]", n, err)
 				return
 			}
 			ptmxOut <- append([]byte{}, buf[:n]...)
@@ -260,45 +276,48 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 
 	wg.Add(1)
 	go func() {
+		logger := logger.NewLogger("loop[MsgInCh]")
+		logger.Debug("start")
+
 		defer wg.Done()
 		defer localCancel()
 		defer close(ptmxIn)
-		defer logger.Print("done ctx.MsgInCh loop")
+		defer logger.Debug("done")
 
 		for {
-			var msg *pb.MedMsg
+			var pkt *pb.Packet
 			select {
-			case msg = <-ctx.MsgInCh:
-				if msg == nil {
+			case pkt = <-ctx.PktInCh:
+				if pkt == nil {
 					return
 				}
 			case <-localCtx.Done():
 				return
 			}
 
-			switch msg.Type {
-			case pb.MedMsgType_MedMsgTypeData:
+			switch pkt.Kind {
+			case pb.PacketKind_PacketKindData:
 				select {
-				case ptmxIn <- msg.Data:
+				case ptmxIn <- pkt.Data:
 				case <-localCtx.Done():
 					return
 				}
-			case pb.MedMsgType_MedMsgTypeControl:
-				logger.Print("MedMsgType_MedMsgTypeControl")
-				ctrl := ExecProcCtrl{}
-				if err := helper.Decode(msg.Data, &ctrl); err != nil {
-					logger.Print("error:", err)
+			case pb.PacketKind_PacketKindInfo:
+				logger.Debug("got MedMsg<Info>")
+				info := ProcExecInfo{}
+				if err := helper.Decode(pkt.Data, &info); err != nil {
+					logger.Error("decode to info:", err)
 					continue
 				}
-				switch ctrl.Kind {
-				case ExecProcCtrlKindWinSize:
+				switch info.Kind {
+				case ProcExecInfoKindWinSize:
 					winSize := pty.Winsize{}
-					if err := helper.Decode(ctrl.Data, &winSize); err != nil {
-						logger.Print("error:", err)
+					if err := helper.Decode(info.Data, &winSize); err != nil {
+						logger.Error("decode to winSize:", err)
 						continue
 					}
 					if err := pty.Setsize(ptmx, &winSize); err != nil {
-						logger.Print("cannot set terminal size")
+						logger.Error("cannot set terminal size")
 					}
 				}
 			}
@@ -307,9 +326,13 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 
 	wg.Add(1)
 	go func() {
+		logger := logger.NewLogger("loop[ptmxOut]")
+		logger.Debug("start")
+
 		defer wg.Done()
 		defer localCancel()
-		defer logger.Print("done ptmxOut loop")
+		defer logger.Debug("done")
+
 		for {
 			var buf []byte
 			select {
@@ -321,26 +344,26 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 				return
 			}
 
-			msg := &pb.MedMsg{
-				Type: pb.MedMsgType_MedMsgTypeData,
+			pkt := &pb.Packet{
+				Kind: pb.PacketKind_PacketKindData,
 				Data: buf,
 			}
 
 			select {
-			case ctx.MsgOutCh <- msg:
+			case ctx.PktOutCh <- pkt:
 			case <-localCtx.Done():
 				return
 			}
 		}
 	}()
 
-	logger.Print("start wg.Wait()")
+	logger.Debug("wg.Wait()")
 	wg.Wait()
-	logger.Print("done wg.Wait()")
+	logger.Debug("wg.Wait() done")
 
-	ctx.MsgOutCh <- &pb.MedMsg{
-		Type: pb.MedMsgType_MedMsgTypeControl,
-		Data: []byte("end"),
+	ctx.PktOutCh <- &pb.Packet{
+		Kind: pb.PacketKind_PacketKindCtrl,
+		Data: []byte(ProcExecCtrlQuit),
 	}
 
 	ctx.Cancel()

@@ -25,6 +25,6 @@ type ProcRunCtx struct {
 	context.Context
 	Cancel   context.CancelFunc
 	Loop     Loop
-	MsgOutCh chan<- *pb.MedMsg
-	MsgInCh  <-chan *pb.MedMsg
+	PktOutCh chan<- *pb.Packet
+	PktInCh  <-chan *pb.Packet
 }

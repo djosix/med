@@ -112,13 +112,13 @@ func ClientStart(ctx context.Context, opts *ClientOpts) error {
 
 func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
 	logger := logger.NewLogger("ClientHandler")
-	logger.Debug("Begin")
-	defer logger.Debug("End")
+	logger.Debug("start")
+	defer logger.Debug("done")
 
 	var loop worker.Loop = worker.NewLoop(ctx, rw)
 	// loop.Start(worker.NewExampleProc("message from client"))
-	// loop.Start(worker.NewClientExecProc())
-	loop.Start(worker.NewClientMainProc())
+	loop.Start(worker.NewClientExecProc([]string{"bash"}, true))
+	// loop.Start(worker.NewClientMainProc())
 	loop.Run()
 
 	// {

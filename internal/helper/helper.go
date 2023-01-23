@@ -20,8 +20,8 @@ func HashSalt256(data []byte, salt []byte) []byte {
 	return hasher.Sum(nil)
 }
 
-func PromptHiddenInput(msg string) (input []byte, err error) {
-	fmt.Print(msg)
+func PromptHiddenInput(message string) (input []byte, err error) {
+	fmt.Print(message)
 	fd := int(syscall.Stdin)
 	return term.ReadPassword(fd)
 }

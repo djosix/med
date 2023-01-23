@@ -12,7 +12,7 @@ func (l Logger) NewLogger(name string) Logger {
 	if l == "" {
 		return Logger(name)
 	} else {
-		return Logger(l + "." + Logger(name))
+		return Logger(l + "/" + Logger(name))
 	}
 }
 

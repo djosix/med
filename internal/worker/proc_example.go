@@ -18,14 +18,12 @@ func NewExampleProc(message string) *ExampleProc {
 
 func (p *ExampleProc) Run(ctx ProcRunCtx) {
 	fmt.Printf("ExampleProc: sending %#v\n", p.message)
-	ctx.MsgOutCh <- &pb.MedMsg{
-		Type: pb.MedMsgType_MedMsgTypeData,
+	ctx.PktOutCh <- &pb.Packet{
+		Kind: pb.PacketKind_PacketKindData,
 		Data: []byte(p.message),
 	}
 	fmt.Printf("ExampleProc: waiting for response\n")
 
-	msg := <-ctx.MsgInCh
+	msg := <-ctx.PktInCh
 	fmt.Printf("ExampleProc: received %#v\n", string(msg.Data))
-
-	ctx.Loop.Cancel()
 }

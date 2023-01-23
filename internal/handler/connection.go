@@ -39,8 +39,10 @@ func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) 
 		select {
 		case conn := <-connCh:
 			go func(conn net.Conn, gateCh chan struct{}) {
-				defer conn.Close()
-				logger.Info("Accept", conn.RemoteAddr())
+				defer func() {
+					conn.Close()
+					logger.Info("closed connection to", conn.RemoteAddr())
+				}()
 
 				ctx := context.WithValue(ctx, "conn", conn)
 				if err := handler(ctx, conn); err != nil {

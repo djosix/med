@@ -113,23 +113,15 @@ func ServerStart(ctx context.Context, opts *ServerOpts) error {
 
 func ServerHandler(ctx context.Context, rw io.ReadWriter) error {
 	logger := logger.NewLogger("ServerHandler")
-	logger.Debug("Begin")
-	defer logger.Debug("End")
+	logger.Debug("start")
+	defer logger.Debug("done")
 
 	var loop worker.Loop = worker.NewLoop(ctx, rw)
 	// loop.Start(worker.NewExampleProc("message from server"))
-	// loop.Start(worker.NewServerExecProc())
-	loop.Start(worker.NewServerMainProc())
-	loop.Run()
+	loop.Start(worker.NewServerExecProc())
+	// loop.Start(worker.NewServerMainProc())
 
-	{
-		buf := []byte("server loop closed")
-		if _, err := rw.Write(buf); err == nil {
-			if n, err := rw.Read(buf); err == nil {
-				logger.Print("remote:", string(buf[:n]))
-			}
-		}
-	}
+	loop.Run()
 
 	return nil
 }

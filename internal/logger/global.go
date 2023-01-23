@@ -29,6 +29,7 @@ var (
 		"INFO",
 		"DEBUG",
 	}
+	logTimeLevel = true
 )
 
 func SetLevel(level LogLevel) {
@@ -36,6 +37,10 @@ func SetLevel(level LogLevel) {
 		panic("invalid level")
 	}
 	logLevel = level
+}
+
+func SetAddPrefix(value bool) {
+	logTimeLevel = value
 }
 
 func SwapTarget(w io.Writer) io.Writer {
@@ -63,8 +68,11 @@ func Log(level LogLevel, a ...any) (n int, err error) {
 	if logTarget == nil {
 		return 0, nil
 	}
-	prefix := fmt.Sprintf("%s | %5s |", getDateTime(), logLevelText[level])
-	return Print(append([]any{prefix}, a...)...)
+	s := []any{}
+	if logTimeLevel {
+		s = append(s, fmt.Sprintf("%s [%5s]", getDateTime(), logLevelText[level]))
+	}
+	return Print(append(s, a...)...)
 }
 
 func Logf(level LogLevel, format string, a ...any) (n int, err error) {

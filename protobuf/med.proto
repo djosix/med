@@ -16,21 +16,16 @@ message KexResp {
 }
 
 
-message MedPkt {
+message Packet {
     uint32 TargetID = 1;
     uint32 SourceID = 2;
-    MedMsg Message = 3;
+    PacketKind Kind = 3;
+    bytes Data = 4;
 }
 
-
-message MedMsg {
-    MedMsgType Type = 1;
-    bytes Data = 2;
-}
-
-enum MedMsgType {
-    MedMsgTypeNone = 0;
-    MedMsgTypeControl = 1;
-    MedMsgTypeData = 2;
-    MedMsgTypeError = 3;
+enum PacketKind {
+    PacketKindInfo = 0;
+    PacketKindCtrl = 1;
+    PacketKindData = 2;
+    PacketKindError = 3;
 }
