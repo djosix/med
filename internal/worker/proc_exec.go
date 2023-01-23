@@ -29,6 +29,11 @@ type ProcExecInfo struct {
 	Data []byte
 }
 
+type ProcExecSpec struct {
+	ARGV []string
+	TTY  bool
+}
+
 ///////////////////////////////////////////////////////////////////////////
 
 type ClientExecProc struct {
@@ -56,29 +61,37 @@ func NewClientExecProc(argv []string, tty bool) *ClientExecProc {
 }
 
 func (p *ClientExecProc) Run(ctx ProcRunCtx) {
-	// ctx.MsgOutCh <- &pb.MedMsg{
-	// }
+	ctx.PktOutCh <- &pb.Packet{
+		TargetID: ctx.ProcID,
+		Kind:     pb.PacketKind_PacketKindInfo,
+		Data:     helper.MustEncode(&ProcExecSpec{ARGV: p.argv, TTY: p.tty}),
+	}
 
 	if p.tty {
 		oldState, err := term.MakeRaw(int(p.stdin.Fd()))
 		if err != nil {
 			panic(err)
 		}
-		tempBuf := bytes.NewBuffer([]byte{})
-		oldLoggerTarget := logger.SwapTarget(tempBuf)
+
+		// Save logger outputs instead of writing to stdout
+		loggerOutputBuf := bytes.NewBuffer([]byte{})
+		loggerTarget := logger.SwapTarget(loggerOutputBuf)
+
 		defer func() {
 			_ = term.Restore(int(p.stdin.Fd()), oldState)
-			logger.SwapTarget(oldLoggerTarget)
-			tempBuf.WriteTo(oldLoggerTarget)
+
+			// Write saved logger outputs to stdout
+			logger.SwapTarget(loggerTarget)
+			loggerOutputBuf.WriteTo(loggerTarget)
 		}()
 	}
 
-	localCtx, localCancel := context.WithCancel(ctx)
-
+	ctx1, cancel1 := context.WithCancel(ctx)
 	wg := sync.WaitGroup{}
 
-	// Handle SIGWINCH
 	if p.tty {
+		// Handle SIGWINCH
+
 		sigCh := make(chan os.Signal, 1)
 		sigCh <- syscall.SIGWINCH
 		signal.Notify(sigCh, syscall.SIGWINCH)
@@ -96,7 +109,7 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 			for {
 				select {
 				case <-sigCh:
-				case <-localCtx.Done():
+				case <-ctx1.Done():
 					return
 				}
 				winSize, err := pty.GetsizeFull(p.stdin)
@@ -118,11 +131,11 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 	// Handle IO
 	wg.Add(1)
 	go func() {
-		logger := logger.NewLogger("loop[ctx.MsgInCh]")
+		logger := logger.NewLogger("loop[ctx.PktInCh]")
 		logger.Debug("start")
 
 		defer wg.Done()
-		defer localCancel()
+		defer cancel1()
 		defer logger.Debug("done")
 
 		for {
@@ -130,18 +143,20 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 			select {
 			case pkt = <-ctx.PktInCh:
 				if pkt == nil {
-					return // ctx.MsgInCh is closed
+					return // ctx.PktInCh is closed
 				}
-			case <-localCtx.Done():
+			case <-ctx1.Done():
 				return
 			}
 
 			switch pkt.Kind {
 			case pb.PacketKind_PacketKindCtrl:
-				if bytes.Equal(pkt.Data, []byte(ProcExecCtrlQuit)) {
+				switch string(pkt.Data) {
+				case ProcExecCtrlQuit:
+					logger.Debug("ProcExecCtrlQuit")
 					return
-				} else {
-					panic(fmt.Sprintln("unknown MedMsgType_MedMsgTypeControl:", pkt.Data))
+				default:
+					logger.Warn("unknown pkt.Data for PacketKind_PacketKindCtrl:", pkt.Data)
 				}
 			case pb.PacketKind_PacketKindData:
 				p.stdout.Write(pkt.Data)
@@ -155,7 +170,7 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 		logger.Debug("start")
 
 		defer wg.Done()
-		defer localCancel()
+		defer cancel1()
 		defer logger.Debug("done")
 
 		buf := make([]byte, 1024)
@@ -171,7 +186,7 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 			}
 			select {
 			case ctx.PktOutCh <- pkt:
-			case <-localCtx.Done():
+			case <-ctx1.Done():
 				return
 			}
 		}
@@ -182,13 +197,67 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 		defer wg.Done()
 		defer logger.Debug("p.stdinReader.BreakRead()")
 
-		<-localCtx.Done()
+		<-ctx1.Done()
 		p.stdinReader.BreakRead()
 	}()
 
 	wg.Wait()
+}
 
-	ctx.Loop.Stop()
+type ChanWriter struct {
+	ctx context.Context
+	ch  chan []byte
+}
+
+func NewChanWriter(ctx context.Context) *ChanWriter {
+	return &ChanWriter{
+		ctx: ctx,
+		ch:  make(chan []byte, 1),
+	}
+}
+
+func (w *ChanWriter) Write(p []byte) (n int, err error) {
+	select {
+	case w.ch <- p:
+		return len(p), nil
+	case <-w.ctx.Done():
+		return 0, fmt.Errorf("broken")
+	}
+}
+
+type ChanReader struct {
+	ctx context.Context
+	ch  chan []byte
+	buf []byte
+}
+
+func NewChanReader(ctx context.Context) *ChanReader {
+	return &ChanReader{
+		ctx: ctx,
+		ch:  make(chan []byte, 1),
+		buf: []byte{},
+	}
+}
+
+func (r *ChanReader) Read(p []byte) (n int, err error) {
+	if len(r.buf) > 0 {
+		n = copy(p, r.buf)
+		r.buf = append([]byte{}, r.buf[n:]...)
+		return n, nil
+	}
+
+	select {
+	case buf := <-r.ch:
+		n = copy(p, buf)
+		buf = buf[n:]
+		if len(buf) > 0 {
+			r.buf = append(r.buf, buf...)
+		}
+		return n, nil
+	case <-r.ctx.Done():
+		return 0, fmt.Errorf("broken")
+	}
+
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -204,20 +273,169 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 	logger.Debug("start")
 	defer logger.Debug("done")
 
-	c := exec.Command("bash")
-
-	ptmx, err := pty.Start(c)
-	if err != nil {
-		logger.Error("pty.Start:", err)
+	// Get spec from client
+	var spec ProcExecSpec
+	select {
+	case pkt := <-ctx.PktInCh:
+		if pkt.Kind != pb.PacketKind_PacketKindInfo {
+			logger.Error("the first packet.kind is not info")
+			return
+		}
+		if err := helper.Decode(pkt.Data, &spec); err != nil {
+			logger.Error("decode spec:", err)
+			return
+		}
+		if len(spec.ARGV) == 0 {
+			logger.Error("invalid argv:", spec.ARGV)
+			return
+		}
+		logger.Debug("spec:", spec)
+	case <-ctx.Done():
 		return
 	}
-	defer func() { _ = ptmx.Close() }()
 
-	localCtx, localCancel := context.WithCancel(ctx)
-	ptmxIn := make(chan []byte, 4)
-	ptmxOut := make(chan []byte, 4)
+	cmd := exec.Command(spec.ARGV[0], spec.ARGV[1:]...)
+
+	ctx1, cancel1 := context.WithCancel(ctx)
+	defer cancel1()
 
 	wg := sync.WaitGroup{}
+
+	startWriter := func(file *os.File) chan<- []byte {
+		ch := make(chan []byte, 1)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case buf := <-ch:
+					if buf == nil {
+						return // ch is closed
+					}
+					if _, err := file.Write(buf); err != nil {
+						logger.Debug("file.Write:", err)
+						return
+					}
+				case <-ctx1.Done():
+					return
+				}
+			}
+		}()
+
+		return ch
+	}
+
+	startReader := func(file *os.File) <-chan []byte {
+		ch := make(chan []byte, 1)
+		r := helper.NewBreakableReader(file, 1024)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-ctx1.Done()
+			r.BreakRead()
+			r.Cancel()
+			close(ch)
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer r.Cancel()
+			defer close(ch)
+			buf := [1024]byte{}
+			for {
+				n, err := r.Read(buf[:])
+				if err != nil || n == 0 {
+					return
+				}
+				select {
+				case ch <- buf[:n]:
+				case <-ctx1.Done():
+					return
+				}
+			}
+		}()
+
+		return ch
+	}
+
+	startSender := func(fd byte, ch <-chan []byte) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			for {
+				var buf []byte
+				select {
+				case buf = <-ch:
+				case <-ctx1.Done():
+					return
+				}
+
+				pkt := &pb.Packet{
+					Kind: pb.PacketKind_PacketKindData,
+					Data: append([]byte{fd}, buf...),
+				}
+
+				select {
+				case ctx.PktOutCh <- pkt:
+				case <-ctx1.Done():
+					return
+				}
+			}
+		}()
+	}
+
+	var inputCh chan<- []byte
+
+	if spec.TTY {
+		ptmx, err := pty.Start(cmd)
+		if err != nil {
+			logger.Error("pty.Start:", err)
+			return
+		}
+		defer func() { _ = ptmx.Close() }()
+
+		inputCh = startWriter(ptmx)
+		startSender(1, startReader(ptmx))
+	} else {
+		var (
+			err     error
+			stdinW  *os.File
+			stdoutR *os.File
+			stderrR *os.File
+		)
+
+		cmd.Stdin, stdinW, err = os.Pipe()
+		if err != nil {
+			logger.Error("os.Pipe:", err)
+			return
+		}
+		stdoutR, cmd.Stdout, err = os.Pipe()
+		if err != nil {
+			logger.Error("os.Pipe:", err)
+			return
+		}
+		stderrR, cmd.Stdin, err = os.Pipe()
+		if err != nil {
+			logger.Error("os.Pipe:", err)
+			return
+		}
+
+		if err := cmd.Start(); err != nil {
+			logger.Error("cmd.Start:", err)
+			return
+		}
+
+		inputCh = startWriter(stdinW)
+		startSender(1, startReader(stdoutR))
+		startSender(2, startReader(stderrR))
+	}
+
+	ptmxIn := make(chan []byte, 4)
+	ptmxOut := make(chan []byte, 4)
 
 	wg.Add(1)
 	go func() {
@@ -225,9 +443,9 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 		logger.Debug("start")
 		defer wg.Done()
 		defer logger.Debug("done")
-		<-localCtx.Done()
-		c.Process.Kill()
-		c.Process.Wait()
+		<-ctx1.Done()
+		cmd.Process.Kill()
+		cmd.Process.Wait()
 	}()
 
 	wg.Add(1)
@@ -235,7 +453,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 		logger := logger.NewLogger("loop[ptmxIn]")
 		logger.Debug("start")
 		defer wg.Done()
-		defer localCancel()
+		defer cancel1()
 		defer logger.Debug("done")
 		for {
 			var buf []byte
@@ -244,7 +462,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 				if buf == nil {
 					return
 				}
-			case <-localCtx.Done():
+			case <-ctx1.Done():
 				return
 			}
 
@@ -260,7 +478,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 		logger := logger.NewLogger("loop[ptmx.Read]")
 		logger.Debug("start")
 		defer wg.Done()
-		defer localCancel()
+		defer cancel1()
 		defer close(ptmxOut)
 		defer logger.Debug("done")
 		buf := [1024]byte{}
@@ -276,11 +494,11 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 
 	wg.Add(1)
 	go func() {
-		logger := logger.NewLogger("loop[MsgInCh]")
+		logger := logger.NewLogger("loop[PktInCh]")
 		logger.Debug("start")
 
 		defer wg.Done()
-		defer localCancel()
+		defer cancel1()
 		defer close(ptmxIn)
 		defer logger.Debug("done")
 
@@ -291,7 +509,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 				if pkt == nil {
 					return
 				}
-			case <-localCtx.Done():
+			case <-ctx1.Done():
 				return
 			}
 
@@ -299,7 +517,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 			case pb.PacketKind_PacketKindData:
 				select {
 				case ptmxIn <- pkt.Data:
-				case <-localCtx.Done():
+				case <-ctx1.Done():
 					return
 				}
 			case pb.PacketKind_PacketKindInfo:
@@ -330,7 +548,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 		logger.Debug("start")
 
 		defer wg.Done()
-		defer localCancel()
+		defer cancel1()
 		defer logger.Debug("done")
 
 		for {
@@ -340,7 +558,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 				if buf == nil {
 					return
 				}
-			case <-localCtx.Done():
+			case <-ctx1.Done():
 				return
 			}
 
@@ -351,7 +569,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 
 			select {
 			case ctx.PktOutCh <- pkt:
-			case <-localCtx.Done():
+			case <-ctx1.Done():
 				return
 			}
 		}

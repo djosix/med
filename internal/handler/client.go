@@ -117,7 +117,7 @@ func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
 
 	var loop worker.Loop = worker.NewLoop(ctx, rw)
 	// loop.Start(worker.NewExampleProc("message from client"))
-	loop.Start(worker.NewClientExecProc([]string{"bash"}, true))
+	loop.Start(worker.NewClientExecProc([]string{"bash"}, false))
 	// loop.Start(worker.NewClientMainProc())
 	loop.Run()
 

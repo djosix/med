@@ -27,4 +27,5 @@ type ProcRunCtx struct {
 	Loop     Loop
 	PktOutCh chan<- *pb.Packet
 	PktInCh  <-chan *pb.Packet
+	ProcID   uint32
 }

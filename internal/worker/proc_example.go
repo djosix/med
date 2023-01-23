@@ -24,6 +24,6 @@ func (p *ExampleProc) Run(ctx ProcRunCtx) {
 	}
 	fmt.Printf("ExampleProc: waiting for response\n")
 
-	msg := <-ctx.PktInCh
-	fmt.Printf("ExampleProc: received %#v\n", string(msg.Data))
+	pkt := <-ctx.PktInCh
+	fmt.Printf("ExampleProc: received %#v\n", string(pkt.Data))
 }

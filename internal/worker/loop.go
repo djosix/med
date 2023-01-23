@@ -126,10 +126,7 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 		loop.lastProcID = procID
 	}
 
-	ctx, cancel := context.WithCancel(
-		context.WithValue(loop.ctx, "procID", procID),
-	)
-
+	ctx, cancel := context.WithCancel(loop.ctx)
 	pktInCh := make(chan *pb.Packet)
 	pktOutCh := make(chan *pb.Packet, 1)
 
@@ -185,6 +182,7 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 			Loop:     loop,
 			PktInCh:  pktInCh,
 			PktOutCh: pktOutCh,
+			ProcID:   procID,
 		}
 		p.Run(runCtx)
 	}()
@@ -289,7 +287,7 @@ func (loop *LoopImpl) dispatcher() {
 		select {
 		case pkt := <-loop.pktInCh:
 			if pkt == nil {
-				logger.Error("MedMsg from loop.inPktCh is nil")
+				logger.Error("loop.inPktCh: nil")
 				return
 			}
 			if err := dispatchToProc(pkt); err != nil {
