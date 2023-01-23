@@ -113,6 +113,7 @@ func ClientStart(ctx context.Context, opts *ClientOpts) error {
 }
 
 func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
+
 	log.Println("ClientHandler BEGIN")
 	defer log.Println("ClientHandler END")
 

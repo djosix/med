@@ -41,7 +41,7 @@ func NewClientExecProc() *ClientExecProc {
 		stdin:  os.Stdin,
 		stdout: os.Stdout,
 		stderr: os.Stderr,
-		tty:    true,
+		tty:    false,
 	}
 }
 
@@ -65,6 +65,7 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 		sigCh := make(chan os.Signal, 1)
 		sigCh <- syscall.SIGWINCH
 		signal.Notify(sigCh, syscall.SIGWINCH)
+		defer func() { signal.Stop(sigCh); close(sigCh) }() // Cleanup signals when done.
 
 		wg.Add(1)
 		go func() {
@@ -102,7 +103,6 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 				}
 			}
 		}()
-		defer func() { signal.Stop(sigCh); close(sigCh) }() // Cleanup signals when done.
 	}
 
 	// Handle IO
@@ -143,7 +143,7 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 		defer fmt.Println("done stdin loop")
 		buf := make([]byte, 1024)
 		for {
-			n, err := p.stdin.Read(buf)
+			n, err := helper.BreakableStdin.Read(buf)
 			if err != nil || n == 0 {
 				fmt.Println("stdin:", err)
 				return
@@ -159,6 +159,13 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 			}
 
 		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		<-localCtx.Done()
+		helper.BreakableStdin.BreakRead()
 	}()
 
 	fmt.Println("start wg.Wait()")

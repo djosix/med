@@ -21,11 +21,12 @@ var (
 )
 
 type Loop interface {
-	Run()                  // Run the loop
-	Start(h Proc) uint32   // Start a MedProc
-	Remove(id uint32) bool // Remove a MedProc
-	Done() <-chan struct{} // Get the done chan of ctx
-	Cancel()               // Get the canceller of ctx
+	Run()                     // Run the loop
+	Start(h Proc) uint32      // Start a MedProc
+	Remove(id uint32) bool    // Remove a MedProc
+	Done() <-chan struct{}    // Get the done chan of ctx
+	Context() context.Context // Get the ctx of loop
+	Cancel()                  // Get the canceller of ctx
 }
 
 type LoopImpl struct {
@@ -168,6 +169,10 @@ func (loop *LoopImpl) Remove(procID uint32) bool {
 		p.cancel()
 	}
 	return ok
+}
+
+func (loop *LoopImpl) Context() context.Context {
+	return loop.ctx
 }
 
 func (loop *LoopImpl) Done() <-chan struct{} {
