@@ -67,6 +67,7 @@ func GetServerOpts(cmd *cobra.Command, args []string) (*ServerOpts, error) {
 
 func ServerMain(cmd *cobra.Command, args []string) {
 	logger := logger.NewLogger("ServerMain")
+	defer logger.Debug("Done")
 
 	opts, err := GetServerOpts(cmd, args)
 	if err != nil {
@@ -80,7 +81,6 @@ func ServerMain(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	logger.Debug("ServerMain Done")
 }
 
 func ServerStart(ctx context.Context, opts *ServerOpts) error {
@@ -117,8 +117,9 @@ func ServerHandler(ctx context.Context, rw io.ReadWriter) error {
 	defer logger.Debug("End")
 
 	var loop worker.Loop = worker.NewLoop(ctx, rw)
-	loop.Start(worker.NewExampleProc("message from server"))
+	// loop.Start(worker.NewExampleProc("message from server"))
 	// loop.Start(worker.NewServerExecProc())
+	loop.Start(worker.NewServerMainProc())
 	loop.Run()
 
 	{

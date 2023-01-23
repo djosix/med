@@ -68,6 +68,7 @@ func GetClientOpts(cmd *cobra.Command, args []string) (*ClientOpts, error) {
 
 func ClientMain(cmd *cobra.Command, args []string) {
 	logger := logger.NewLogger("ClientMain")
+	defer logger.Debug("Done")
 
 	opts, err := GetClientOpts(cmd, args)
 	if err != nil {
@@ -81,7 +82,6 @@ func ClientMain(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	logger.Debug("ClientMain Done")
 }
 
 func ClientStart(ctx context.Context, opts *ClientOpts) error {
@@ -116,8 +116,9 @@ func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
 	defer logger.Debug("End")
 
 	var loop worker.Loop = worker.NewLoop(ctx, rw)
-	loop.Start(worker.NewExampleProc("message from client"))
+	// loop.Start(worker.NewExampleProc("message from client"))
 	// loop.Start(worker.NewClientExecProc())
+	loop.Start(worker.NewClientMainProc())
 	loop.Run()
 
 	// {

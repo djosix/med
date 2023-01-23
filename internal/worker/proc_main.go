@@ -61,7 +61,12 @@ func NewClientMainProc() *ClientMainProc {
 
 func (p *ClientMainProc) Run(ctx ProcRunCtx) {
 
+	logger := logger.NewLogger("ClientMainProc")
+	logger.Info("Begin")
+	defer logger.Info("End")
+
 	{
+
 		ctx.MsgOutCh <- &pb.MedMsg{
 			Type:    pb.MedMsgType_MedMsgTypeControl,
 			Content: encodeMedMainMsg(MedMainMsgKindStartReq, p.encodeStartReq(MedProcKindExec)),

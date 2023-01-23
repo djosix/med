@@ -31,7 +31,7 @@ type Loop interface {
 }
 
 type LoopImpl struct {
-	lastProcID uint32
+	nextProcID uint32
 	procData   map[uint32]loopProcInfo
 	procLock   sync.Mutex
 	pktInCh    chan *pb.MedPkt
@@ -58,7 +58,7 @@ func NewLoop(ctx context.Context, rw io.ReadWriter) *LoopImpl {
 	ctx, cancel = context.WithCancel(ctx)
 
 	return &LoopImpl{
-		lastProcID: 0,
+		nextProcID: 0,
 		procData:   map[uint32]loopProcInfo{},
 		procLock:   sync.Mutex{},
 		pktInCh:    make(chan *pb.MedPkt),
@@ -71,6 +71,10 @@ func NewLoop(ctx context.Context, rw io.ReadWriter) *LoopImpl {
 }
 
 func (loop *LoopImpl) Run() {
+	logger := loopLogger.NewLogger("Run")
+	logger.Debug("Begin")
+	defer logger.Debug("End")
+
 	for _, loopFunc := range []func(){
 		loop.loopRead,
 		loop.loopDispatch,
@@ -97,8 +101,15 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 	loop.procLock.Lock()
 	defer loop.procLock.Unlock()
 
-	procID = loop.lastProcID + 1
-	loop.lastProcID = procID
+	for {
+		procID = loop.nextProcID
+		loop.nextProcID++
+
+		_, procExists := loop.procData[procID]
+		if !procExists {
+			break
+		}
+	}
 
 	ctx, cancel := context.WithCancel(
 		context.WithValue(loop.ctx, "procID", procID),
@@ -109,8 +120,10 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 
 	loop.wg.Add(1)
 	go func() {
+		logger := loopLogger.NewLogger(fmt.Sprintf("msgOutCh[%v]", procID))
+		logger.Debug("Begin")
 		defer loop.wg.Done()
-		defer loopLogger.Debugf("msgOutCh[%v] Done", procID)
+		defer logger.Debug("End")
 		for {
 			var msg *pb.MedMsg
 			select {
@@ -144,7 +157,10 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 
 	loop.wg.Add(1)
 	go func() {
+		logger := loopLogger.NewLogger(fmt.Sprintf("proc[%v]", procID))
+		logger.Debug("Begin")
 		defer loop.wg.Done()
+		defer logger.Debug("End")
 		runCtx := ProcRunCtx{
 			Context:  ctx,
 			Cancel:   cancel,
