@@ -18,6 +18,7 @@ import (
 var (
 	ErrLoopClosed = fmt.Errorf("loop closed")
 	ErrTimeout    = fmt.Errorf("timeout")
+	loopLogger    = logger.NewLogger("Loop")
 )
 
 type Loop interface {
@@ -51,7 +52,7 @@ type loopProcInfo struct {
 func NewLoop(ctx context.Context, rw io.ReadWriter) *LoopImpl {
 	var frameRw readwriter.FrameReadWriter
 	frameRw = readwriter.NewPlainFrameReadWriter(rw)
-	// frameRw = readwriter.NewSnappyFrameReadWriter(frameRw) // compress frames
+	frameRw = readwriter.NewSnappyFrameReadWriter(frameRw) // compress frames
 
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithCancel(ctx)
@@ -79,7 +80,7 @@ func (loop *LoopImpl) Run() {
 		loop.wg.Add(1)
 		go func() {
 			defer loop.wg.Done()
-			defer loop.Cancel() // stop all other loops after any loop ends
+			defer loop.Cancel() // stop all other loops after any ends
 			loopFunc()
 		}()
 	}
@@ -109,7 +110,7 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 	loop.wg.Add(1)
 	go func() {
 		defer loop.wg.Done()
-		defer logger.Print("done msgOutCh loop of proc", procID)
+		defer loopLogger.Debugf("msgOutCh[%v] Done", procID)
 		for {
 			var msg *pb.MedMsg
 			select {
@@ -189,20 +190,23 @@ func (loop *LoopImpl) Cancel() {
 }
 
 func (loop *LoopImpl) loopRead() {
-	defer logger.Print("done loopRead")
+	logger := loopLogger.NewLogger("Read")
+	logger.Debug("Begin")
+	defer logger.Debug("End")
+
 	for {
 		frame, err := loop.frameRw.ReadFrame()
 		if err != nil {
-			logger.Print("cannot read frame:", err)
+			logger.Info("cannot read frame:", err)
 			return
 		}
 		inPkt := pb.MedPkt{}
 		if err = proto.Unmarshal(frame, &inPkt); err != nil {
-			logger.Print("cannot unmarshal frame to MedPkt:", err)
+			logger.Error("cannot unmarshal frame to MedPkt:", err)
 			continue
 		}
 		if inPkt.Message.Type == pb.MedMsgType_MedMsgTypeError {
-			logger.Print("readLoop:", "got error pkt:", inPkt.String())
+			logger.Error("readLoop:", "got error pkt:", inPkt.String())
 			continue
 		}
 		loop.pktInCh <- &inPkt
@@ -210,7 +214,9 @@ func (loop *LoopImpl) loopRead() {
 }
 
 func (loop *LoopImpl) loopDispatch() {
-	defer logger.Print("done loopDispatch")
+	logger := loopLogger.NewLogger("Dispatch")
+	logger.Debug("Begin")
+	defer logger.Debug("End")
 
 	dispatchToProc := func(pkt *pb.MedPkt) error {
 		loop.procLock.Lock()
@@ -237,7 +243,7 @@ func (loop *LoopImpl) loopDispatch() {
 		select {
 		case inPkt := <-loop.pktInCh:
 			if inPkt == nil {
-				logger.Print("MedMsg from loop.inPktCh is nil")
+				logger.Error("MedMsg from loop.inPktCh is nil")
 				return
 			}
 			if err := dispatchToProc(inPkt); err != nil {
@@ -257,12 +263,15 @@ func (loop *LoopImpl) loopDispatch() {
 }
 
 func (loop *LoopImpl) loopWrite() {
-	defer logger.Print("done loopWrite")
+	logger := loopLogger.NewLogger("Write")
+	logger.Debug("Begin")
+	defer logger.Debug("End")
+
 	for {
 		select {
 		case msg := <-loop.pktOutCh:
 			if msg == nil {
-				logger.Print("MedPkt from loop.outPktCh is nil")
+				logger.Error("MedPkt from loop.outPktCh is nil")
 				return
 			}
 			buf, err := proto.Marshal(msg)
@@ -272,7 +281,7 @@ func (loop *LoopImpl) loopWrite() {
 
 			err = loop.frameRw.WriteFrame(buf)
 			if err != nil {
-				logger.Print(err)
+				logger.Error("WriteFrame:", err)
 				return
 			}
 		case <-loop.ctx.Done():
@@ -280,3 +289,9 @@ func (loop *LoopImpl) loopWrite() {
 		}
 	}
 }
+
+// type Logger []string
+
+// func NewLogger() *Logger {
+
+// }

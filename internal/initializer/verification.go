@@ -8,13 +8,12 @@ import (
 	"io"
 
 	"github.com/djosix/med/internal/helper"
-	"github.com/djosix/med/internal/logger"
 	"github.com/djosix/med/internal/readwriter"
 )
 
 func InitVerify(hash []byte) Initializer {
 	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		logger.Debug("InitVerify")
+		initLogger.Debug("Verify")
 
 		ctxOut = ctx
 		rwOut = rw
@@ -26,7 +25,7 @@ func InitVerify(hash []byte) Initializer {
 
 func InitGetVerified(hash []byte) Initializer {
 	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		logger.Debug("InitGetVerified")
+		initLogger.Debug("GetVerified")
 
 		ctxOut = ctx
 		rwOut = rw
@@ -149,7 +148,7 @@ func GetVerified(rw io.ReadWriter, hash []byte) error {
 	case StatusReject, StatusVerify:
 		return rejectErr
 	default:
-		logger.Print("unknown remote status:", status)
+		initLogger.Error("unknown remote status:", status)
 		return statusErr
 	}
 }

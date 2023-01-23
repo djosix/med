@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/djosix/med/internal/logger"
 	"github.com/djosix/med/internal/readwriter"
 )
 
 func InitCheckMagic(sendMagic, recvMagic []byte) Initializer {
 	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		logger.Debug("InitCheckMagic")
+		initLogger.Debug("CheckMagic")
 
 		ctxOut = ctx
 		rwOut = rw

@@ -67,19 +67,21 @@ func GetClientOpts(cmd *cobra.Command, args []string) (*ClientOpts, error) {
 }
 
 func ClientMain(cmd *cobra.Command, args []string) {
+	logger := logger.NewLogger("ClientMain")
+
 	opts, err := GetClientOpts(cmd, args)
 	if err != nil {
-		logger.Print("error:", err)
+		logger.Error("GetClientOpts:", err)
 		return
 	}
 
 	err = ClientStart(cmd.Context(), opts)
 	if err != nil {
-		logger.Print("error:", err)
+		logger.Error("ClientStart:", err)
 		return
 	}
 
-	logger.Print("done")
+	logger.Debug("ClientMain Done")
 }
 
 func ClientStart(ctx context.Context, opts *ClientOpts) error {
@@ -100,26 +102,22 @@ func ClientStart(ctx context.Context, opts *ClientOpts) error {
 
 	switch opts.Mode {
 	case CommonFlagConnect:
-		logger.Print(CommonFlagConnect, opts.Endpoint)
 		return Connect(ctx, opts.Endpoint, handler)
-
 	case CommonFlagListen:
-		logger.Print(CommonFlagListen, opts.Endpoint)
 		return Listen(ctx, opts.Endpoint, handler, 1)
-
 	default:
 		panic(internal.Unexpected)
 	}
 }
 
 func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
-
-	logger.Print("ClientHandler BEGIN")
-	defer logger.Print("ClientHandler END")
+	logger := logger.NewLogger("ClientHandler")
+	logger.Debug("Begin")
+	defer logger.Debug("End")
 
 	var loop worker.Loop = worker.NewLoop(ctx, rw)
-	// loop.Start(worker.NewExampleProc("message from client"))
-	loop.Start(worker.NewClientExecProc())
+	loop.Start(worker.NewExampleProc("message from client"))
+	// loop.Start(worker.NewClientExecProc())
 	loop.Run()
 
 	// {

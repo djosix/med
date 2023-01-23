@@ -72,52 +72,6 @@ func (MedMsgType) EnumDescriptor() ([]byte, []int) {
 	return file_med_proto_rawDescGZIP(), []int{0}
 }
 
-type MedProcType int32
-
-const (
-	MedProcType_MedProcTypeNone    MedProcType = 0
-	MedProcType_MedProcTypeExample MedProcType = 1
-)
-
-// Enum value maps for MedProcType.
-var (
-	MedProcType_name = map[int32]string{
-		0: "MedProcTypeNone",
-		1: "MedProcTypeExample",
-	}
-	MedProcType_value = map[string]int32{
-		"MedProcTypeNone":    0,
-		"MedProcTypeExample": 1,
-	}
-)
-
-func (x MedProcType) Enum() *MedProcType {
-	p := new(MedProcType)
-	*p = x
-	return p
-}
-
-func (x MedProcType) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (MedProcType) Descriptor() protoreflect.EnumDescriptor {
-	return file_med_proto_enumTypes[1].Descriptor()
-}
-
-func (MedProcType) Type() protoreflect.EnumType {
-	return &file_med_proto_enumTypes[1]
-}
-
-func (x MedProcType) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use MedProcType.Descriptor instead.
-func (MedProcType) EnumDescriptor() ([]byte, []int) {
-	return file_med_proto_rawDescGZIP(), []int{1}
-}
-
 type KexReq struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -362,303 +316,6 @@ func (x *MedMsg) GetContent() []byte {
 	return nil
 }
 
-type MedMainMsg struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	// Types that are assignable to Inner:
-	//
-	//	*MedMainMsg_StartReq
-	//	*MedMainMsg_StartResp
-	//	*MedMainMsg_RemoveReq
-	//	*MedMainMsg_RemoveResp
-	Inner isMedMainMsg_Inner `protobuf_oneof:"inner"`
-}
-
-func (x *MedMainMsg) Reset() {
-	*x = MedMainMsg{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_med_proto_msgTypes[4]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *MedMainMsg) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MedMainMsg) ProtoMessage() {}
-
-func (x *MedMainMsg) ProtoReflect() protoreflect.Message {
-	mi := &file_med_proto_msgTypes[4]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MedMainMsg.ProtoReflect.Descriptor instead.
-func (*MedMainMsg) Descriptor() ([]byte, []int) {
-	return file_med_proto_rawDescGZIP(), []int{4}
-}
-
-func (m *MedMainMsg) GetInner() isMedMainMsg_Inner {
-	if m != nil {
-		return m.Inner
-	}
-	return nil
-}
-
-func (x *MedMainMsg) GetStartReq() *MedMainStartReq {
-	if x, ok := x.GetInner().(*MedMainMsg_StartReq); ok {
-		return x.StartReq
-	}
-	return nil
-}
-
-func (x *MedMainMsg) GetStartResp() *MedMainStartResp {
-	if x, ok := x.GetInner().(*MedMainMsg_StartResp); ok {
-		return x.StartResp
-	}
-	return nil
-}
-
-func (x *MedMainMsg) GetRemoveReq() *MedMainRemoveReq {
-	if x, ok := x.GetInner().(*MedMainMsg_RemoveReq); ok {
-		return x.RemoveReq
-	}
-	return nil
-}
-
-func (x *MedMainMsg) GetRemoveResp() *MedMainRemoveResp {
-	if x, ok := x.GetInner().(*MedMainMsg_RemoveResp); ok {
-		return x.RemoveResp
-	}
-	return nil
-}
-
-type isMedMainMsg_Inner interface {
-	isMedMainMsg_Inner()
-}
-
-type MedMainMsg_StartReq struct {
-	StartReq *MedMainStartReq `protobuf:"bytes,11,opt,name=StartReq,proto3,oneof"`
-}
-
-type MedMainMsg_StartResp struct {
-	StartResp *MedMainStartResp `protobuf:"bytes,12,opt,name=StartResp,proto3,oneof"`
-}
-
-type MedMainMsg_RemoveReq struct {
-	RemoveReq *MedMainRemoveReq `protobuf:"bytes,21,opt,name=RemoveReq,proto3,oneof"`
-}
-
-type MedMainMsg_RemoveResp struct {
-	RemoveResp *MedMainRemoveResp `protobuf:"bytes,22,opt,name=RemoveResp,proto3,oneof"`
-}
-
-func (*MedMainMsg_StartReq) isMedMainMsg_Inner() {}
-
-func (*MedMainMsg_StartResp) isMedMainMsg_Inner() {}
-
-func (*MedMainMsg_RemoveReq) isMedMainMsg_Inner() {}
-
-func (*MedMainMsg_RemoveResp) isMedMainMsg_Inner() {}
-
-type MedMainStartReq struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Type MedProcType `protobuf:"varint,1,opt,name=Type,proto3,enum=proto.MedProcType" json:"Type,omitempty"`
-}
-
-func (x *MedMainStartReq) Reset() {
-	*x = MedMainStartReq{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_med_proto_msgTypes[5]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *MedMainStartReq) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MedMainStartReq) ProtoMessage() {}
-
-func (x *MedMainStartReq) ProtoReflect() protoreflect.Message {
-	mi := &file_med_proto_msgTypes[5]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MedMainStartReq.ProtoReflect.Descriptor instead.
-func (*MedMainStartReq) Descriptor() ([]byte, []int) {
-	return file_med_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *MedMainStartReq) GetType() MedProcType {
-	if x != nil {
-		return x.Type
-	}
-	return MedProcType_MedProcTypeNone
-}
-
-type MedMainStartResp struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	ProcID uint32 `protobuf:"varint,1,opt,name=ProcID,proto3" json:"ProcID,omitempty"`
-}
-
-func (x *MedMainStartResp) Reset() {
-	*x = MedMainStartResp{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_med_proto_msgTypes[6]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *MedMainStartResp) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MedMainStartResp) ProtoMessage() {}
-
-func (x *MedMainStartResp) ProtoReflect() protoreflect.Message {
-	mi := &file_med_proto_msgTypes[6]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MedMainStartResp.ProtoReflect.Descriptor instead.
-func (*MedMainStartResp) Descriptor() ([]byte, []int) {
-	return file_med_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *MedMainStartResp) GetProcID() uint32 {
-	if x != nil {
-		return x.ProcID
-	}
-	return 0
-}
-
-type MedMainRemoveReq struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	ProcID uint32 `protobuf:"varint,1,opt,name=ProcID,proto3" json:"ProcID,omitempty"`
-}
-
-func (x *MedMainRemoveReq) Reset() {
-	*x = MedMainRemoveReq{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_med_proto_msgTypes[7]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *MedMainRemoveReq) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MedMainRemoveReq) ProtoMessage() {}
-
-func (x *MedMainRemoveReq) ProtoReflect() protoreflect.Message {
-	mi := &file_med_proto_msgTypes[7]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MedMainRemoveReq.ProtoReflect.Descriptor instead.
-func (*MedMainRemoveReq) Descriptor() ([]byte, []int) {
-	return file_med_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *MedMainRemoveReq) GetProcID() uint32 {
-	if x != nil {
-		return x.ProcID
-	}
-	return 0
-}
-
-type MedMainRemoveResp struct {
-	state         protoimpl.MessageState
-	sizeCache     protoimpl.SizeCache
-	unknownFields protoimpl.UnknownFields
-
-	Ok bool `protobuf:"varint,1,opt,name=Ok,proto3" json:"Ok,omitempty"`
-}
-
-func (x *MedMainRemoveResp) Reset() {
-	*x = MedMainRemoveResp{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_med_proto_msgTypes[8]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
-}
-
-func (x *MedMainRemoveResp) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*MedMainRemoveResp) ProtoMessage() {}
-
-func (x *MedMainRemoveResp) ProtoReflect() protoreflect.Message {
-	mi := &file_med_proto_msgTypes[8]
-	if protoimpl.UnsafeEnabled && x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use MedMainRemoveResp.ProtoReflect.Descriptor instead.
-func (*MedMainRemoveResp) Descriptor() ([]byte, []int) {
-	return file_med_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *MedMainRemoveResp) GetOk() bool {
-	if x != nil {
-		return x.Ok
-	}
-	return false
-}
-
 var File_med_proto protoreflect.FileDescriptor
 
 var file_med_proto_rawDesc = []byte{
@@ -686,45 +343,14 @@ var file_med_proto_rawDesc = []byte{
 	0x0a, 0x04, 0x54, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x11, 0x2e, 0x70,
 	0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x4d, 0x65, 0x64, 0x4d, 0x73, 0x67, 0x54, 0x79, 0x70, 0x65, 0x52,
 	0x04, 0x54, 0x79, 0x70, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74,
-	0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x22,
-	0xf9, 0x01, 0x0a, 0x0a, 0x4d, 0x65, 0x64, 0x4d, 0x61, 0x69, 0x6e, 0x4d, 0x73, 0x67, 0x12, 0x34,
-	0x0a, 0x08, 0x53, 0x74, 0x61, 0x72, 0x74, 0x52, 0x65, 0x71, 0x18, 0x0b, 0x20, 0x01, 0x28, 0x0b,
-	0x32, 0x16, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x4d, 0x65, 0x64, 0x4d, 0x61, 0x69, 0x6e,
-	0x53, 0x74, 0x61, 0x72, 0x74, 0x52, 0x65, 0x71, 0x48, 0x00, 0x52, 0x08, 0x53, 0x74, 0x61, 0x72,
-	0x74, 0x52, 0x65, 0x71, 0x12, 0x37, 0x0a, 0x09, 0x53, 0x74, 0x61, 0x72, 0x74, 0x52, 0x65, 0x73,
-	0x70, 0x18, 0x0c, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x17, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e,
-	0x4d, 0x65, 0x64, 0x4d, 0x61, 0x69, 0x6e, 0x53, 0x74, 0x61, 0x72, 0x74, 0x52, 0x65, 0x73, 0x70,
-	0x48, 0x00, 0x52, 0x09, 0x53, 0x74, 0x61, 0x72, 0x74, 0x52, 0x65, 0x73, 0x70, 0x12, 0x37, 0x0a,
-	0x09, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x52, 0x65, 0x71, 0x18, 0x15, 0x20, 0x01, 0x28, 0x0b,
-	0x32, 0x17, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x4d, 0x65, 0x64, 0x4d, 0x61, 0x69, 0x6e,
-	0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x52, 0x65, 0x71, 0x48, 0x00, 0x52, 0x09, 0x52, 0x65, 0x6d,
-	0x6f, 0x76, 0x65, 0x52, 0x65, 0x71, 0x12, 0x3a, 0x0a, 0x0a, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65,
-	0x52, 0x65, 0x73, 0x70, 0x18, 0x16, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x18, 0x2e, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x2e, 0x4d, 0x65, 0x64, 0x4d, 0x61, 0x69, 0x6e, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65,
-	0x52, 0x65, 0x73, 0x70, 0x48, 0x00, 0x52, 0x0a, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x52, 0x65,
-	0x73, 0x70, 0x42, 0x07, 0x0a, 0x05, 0x69, 0x6e, 0x6e, 0x65, 0x72, 0x22, 0x39, 0x0a, 0x0f, 0x4d,
-	0x65, 0x64, 0x4d, 0x61, 0x69, 0x6e, 0x53, 0x74, 0x61, 0x72, 0x74, 0x52, 0x65, 0x71, 0x12, 0x26,
-	0x0a, 0x04, 0x54, 0x79, 0x70, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x12, 0x2e, 0x70,
-	0x72, 0x6f, 0x74, 0x6f, 0x2e, 0x4d, 0x65, 0x64, 0x50, 0x72, 0x6f, 0x63, 0x54, 0x79, 0x70, 0x65,
-	0x52, 0x04, 0x54, 0x79, 0x70, 0x65, 0x22, 0x2a, 0x0a, 0x10, 0x4d, 0x65, 0x64, 0x4d, 0x61, 0x69,
-	0x6e, 0x53, 0x74, 0x61, 0x72, 0x74, 0x52, 0x65, 0x73, 0x70, 0x12, 0x16, 0x0a, 0x06, 0x50, 0x72,
-	0x6f, 0x63, 0x49, 0x44, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x06, 0x50, 0x72, 0x6f, 0x63,
-	0x49, 0x44, 0x22, 0x2a, 0x0a, 0x10, 0x4d, 0x65, 0x64, 0x4d, 0x61, 0x69, 0x6e, 0x52, 0x65, 0x6d,
-	0x6f, 0x76, 0x65, 0x52, 0x65, 0x71, 0x12, 0x16, 0x0a, 0x06, 0x50, 0x72, 0x6f, 0x63, 0x49, 0x44,
-	0x18, 0x01, 0x20, 0x01, 0x28, 0x0d, 0x52, 0x06, 0x50, 0x72, 0x6f, 0x63, 0x49, 0x44, 0x22, 0x23,
-	0x0a, 0x11, 0x4d, 0x65, 0x64, 0x4d, 0x61, 0x69, 0x6e, 0x52, 0x65, 0x6d, 0x6f, 0x76, 0x65, 0x52,
-	0x65, 0x73, 0x70, 0x12, 0x0e, 0x0a, 0x02, 0x4f, 0x6b, 0x18, 0x01, 0x20, 0x01, 0x28, 0x08, 0x52,
-	0x02, 0x4f, 0x6b, 0x2a, 0x60, 0x0a, 0x0a, 0x4d, 0x65, 0x64, 0x4d, 0x73, 0x67, 0x54, 0x79, 0x70,
-	0x65, 0x12, 0x12, 0x0a, 0x0e, 0x4d, 0x65, 0x64, 0x4d, 0x73, 0x67, 0x54, 0x79, 0x70, 0x65, 0x4e,
-	0x6f, 0x6e, 0x65, 0x10, 0x00, 0x12, 0x15, 0x0a, 0x11, 0x4d, 0x65, 0x64, 0x4d, 0x73, 0x67, 0x54,
-	0x79, 0x70, 0x65, 0x43, 0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x10, 0x01, 0x12, 0x12, 0x0a, 0x0e,
-	0x4d, 0x65, 0x64, 0x4d, 0x73, 0x67, 0x54, 0x79, 0x70, 0x65, 0x44, 0x61, 0x74, 0x61, 0x10, 0x02,
-	0x12, 0x13, 0x0a, 0x0f, 0x4d, 0x65, 0x64, 0x4d, 0x73, 0x67, 0x54, 0x79, 0x70, 0x65, 0x45, 0x72,
-	0x72, 0x6f, 0x72, 0x10, 0x03, 0x2a, 0x3a, 0x0a, 0x0b, 0x4d, 0x65, 0x64, 0x50, 0x72, 0x6f, 0x63,
-	0x54, 0x79, 0x70, 0x65, 0x12, 0x13, 0x0a, 0x0f, 0x4d, 0x65, 0x64, 0x50, 0x72, 0x6f, 0x63, 0x54,
-	0x79, 0x70, 0x65, 0x4e, 0x6f, 0x6e, 0x65, 0x10, 0x00, 0x12, 0x16, 0x0a, 0x12, 0x4d, 0x65, 0x64,
-	0x50, 0x72, 0x6f, 0x63, 0x54, 0x79, 0x70, 0x65, 0x45, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x10,
-	0x01, 0x42, 0x15, 0x5a, 0x13, 0x2e, 0x2f, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x2f,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x0c, 0x52, 0x07, 0x43, 0x6f, 0x6e, 0x74, 0x65, 0x6e, 0x74, 0x2a,
+	0x60, 0x0a, 0x0a, 0x4d, 0x65, 0x64, 0x4d, 0x73, 0x67, 0x54, 0x79, 0x70, 0x65, 0x12, 0x12, 0x0a,
+	0x0e, 0x4d, 0x65, 0x64, 0x4d, 0x73, 0x67, 0x54, 0x79, 0x70, 0x65, 0x4e, 0x6f, 0x6e, 0x65, 0x10,
+	0x00, 0x12, 0x15, 0x0a, 0x11, 0x4d, 0x65, 0x64, 0x4d, 0x73, 0x67, 0x54, 0x79, 0x70, 0x65, 0x43,
+	0x6f, 0x6e, 0x74, 0x72, 0x6f, 0x6c, 0x10, 0x01, 0x12, 0x12, 0x0a, 0x0e, 0x4d, 0x65, 0x64, 0x4d,
+	0x73, 0x67, 0x54, 0x79, 0x70, 0x65, 0x44, 0x61, 0x74, 0x61, 0x10, 0x02, 0x12, 0x13, 0x0a, 0x0f,
+	0x4d, 0x65, 0x64, 0x4d, 0x73, 0x67, 0x54, 0x79, 0x70, 0x65, 0x45, 0x72, 0x72, 0x6f, 0x72, 0x10,
+	0x03, 0x42, 0x15, 0x5a, 0x13, 0x2e, 0x2f, 0x69, 0x6e, 0x74, 0x65, 0x72, 0x6e, 0x61, 0x6c, 0x2f,
 	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
@@ -740,34 +366,23 @@ func file_med_proto_rawDescGZIP() []byte {
 	return file_med_proto_rawDescData
 }
 
-var file_med_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_med_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_med_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_med_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_med_proto_goTypes = []interface{}{
-	(MedMsgType)(0),           // 0: proto.MedMsgType
-	(MedProcType)(0),          // 1: proto.MedProcType
-	(*KexReq)(nil),            // 2: proto.KexReq
-	(*KexResp)(nil),           // 3: proto.KexResp
-	(*MedPkt)(nil),            // 4: proto.MedPkt
-	(*MedMsg)(nil),            // 5: proto.MedMsg
-	(*MedMainMsg)(nil),        // 6: proto.MedMainMsg
-	(*MedMainStartReq)(nil),   // 7: proto.MedMainStartReq
-	(*MedMainStartResp)(nil),  // 8: proto.MedMainStartResp
-	(*MedMainRemoveReq)(nil),  // 9: proto.MedMainRemoveReq
-	(*MedMainRemoveResp)(nil), // 10: proto.MedMainRemoveResp
+	(MedMsgType)(0), // 0: proto.MedMsgType
+	(*KexReq)(nil),  // 1: proto.KexReq
+	(*KexResp)(nil), // 2: proto.KexResp
+	(*MedPkt)(nil),  // 3: proto.MedPkt
+	(*MedMsg)(nil),  // 4: proto.MedMsg
 }
 var file_med_proto_depIdxs = []int32{
-	5,  // 0: proto.MedPkt.Message:type_name -> proto.MedMsg
-	0,  // 1: proto.MedMsg.Type:type_name -> proto.MedMsgType
-	7,  // 2: proto.MedMainMsg.StartReq:type_name -> proto.MedMainStartReq
-	8,  // 3: proto.MedMainMsg.StartResp:type_name -> proto.MedMainStartResp
-	9,  // 4: proto.MedMainMsg.RemoveReq:type_name -> proto.MedMainRemoveReq
-	10, // 5: proto.MedMainMsg.RemoveResp:type_name -> proto.MedMainRemoveResp
-	1,  // 6: proto.MedMainStartReq.Type:type_name -> proto.MedProcType
-	7,  // [7:7] is the sub-list for method output_type
-	7,  // [7:7] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	4, // 0: proto.MedPkt.Message:type_name -> proto.MedMsg
+	0, // 1: proto.MedMsg.Type:type_name -> proto.MedMsgType
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_med_proto_init() }
@@ -824,80 +439,14 @@ func file_med_proto_init() {
 				return nil
 			}
 		}
-		file_med_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*MedMainMsg); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_med_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*MedMainStartReq); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_med_proto_msgTypes[6].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*MedMainStartResp); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_med_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*MedMainRemoveReq); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_med_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*MedMainRemoveResp); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-	}
-	file_med_proto_msgTypes[4].OneofWrappers = []interface{}{
-		(*MedMainMsg_StartReq)(nil),
-		(*MedMainMsg_StartResp)(nil),
-		(*MedMainMsg_RemoveReq)(nil),
-		(*MedMainMsg_RemoveResp)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_med_proto_rawDesc,
-			NumEnums:      2,
-			NumMessages:   9,
+			NumEnums:      1,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

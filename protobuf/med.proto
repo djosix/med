@@ -34,36 +34,3 @@ enum MedMsgType {
     MedMsgTypeData = 2;
     MedMsgTypeError = 3;
 }
-
-
-message MedMainMsg {
-    oneof inner {
-        MedMainStartReq StartReq = 11;
-        MedMainStartResp StartResp = 12;
-        MedMainRemoveReq RemoveReq = 21;
-        MedMainRemoveResp RemoveResp = 22;
-    }
-}
-
-enum MedProcType {
-    MedProcTypeNone = 0;
-    MedProcTypeExample = 1;
-}
-
-message MedMainStartReq {
-    MedProcType Type = 1;
-}
-
-message MedMainStartResp {
-    uint32 ProcID = 1;
-}
-
-
-message MedMainRemoveReq {
-    uint32 ProcID = 1;
-}
-
-message MedMainRemoveResp {
-    bool Ok = 1;
-}
-

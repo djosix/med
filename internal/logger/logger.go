@@ -1,147 +1,79 @@
 package logger
 
-import (
-	"fmt"
-	"io"
-	"os"
-	"time"
-)
+type Logger string
 
-type LogLevel int
+var RootLogger Logger = ""
 
-const (
-	LevelDebug    LogLevel = 5
-	LevelInfo     LogLevel = 4
-	LevelWarn     LogLevel = 3
-	LevelError    LogLevel = 2
-	LevelFatal    LogLevel = 1
-	logTimeFormat          = "2006-01-02 15:04:05"
-)
+func NewLogger(name string) Logger {
+	return RootLogger.NewLogger(name)
+}
 
-var (
-	logTarget    io.Writer = os.Stdout
-	logLevel     LogLevel  = LevelInfo
-	logLevelText           = [6]string{
-		"",
-		"Fatal",
-		"ERROR",
-		"WARN",
-		"INFO",
-		"DEBUG",
+func (l Logger) NewLogger(name string) Logger {
+	if l == "" {
+		return Logger(name)
+	} else {
+		return Logger(l + "." + Logger(name))
 	}
-)
+}
 
-func SetLevel(level LogLevel) {
-	if int(level) < 0 || int(level) >= len(logLevelText) {
-		panic("invalid level")
+func (l Logger) prependPrefixToString(s string) string {
+	if l != "" {
+		return string(l) + ": " + s
 	}
-	logLevel = level
+	return s
 }
 
-func SwapTarget(w io.Writer) io.Writer {
-	oldTarget := logTarget
-	logTarget = w
-	return oldTarget
-}
-
-func getDateTime() string {
-	return time.Now().Format(logTimeFormat)
-}
-
-func Print(a ...any) (n int, err error) {
-	if logTarget == nil {
-		return 0, nil
+func (l Logger) prependPrefixToAnySlice(a []any) []any {
+	if l != "" {
+		return append([]any{string(l) + ":"}, a...)
 	}
-	return fmt.Fprintln(logTarget, a...)
+	return a
 }
 
-func Printf(format string, a ...any) (n int, err error) {
-	return Print(fmt.Sprintf(format, a...))
+func (l Logger) Print(a ...any) (n int, err error) {
+	return Print(l.prependPrefixToAnySlice(a)...)
 }
 
-func Log(level LogLevel, a ...any) (n int, err error) {
-	if logTarget == nil {
-		return 0, nil
-	}
-	s := fmt.Sprintf(
-		"%s | %5s | %s",
-		getDateTime(),
-		logLevelText[level],
-		fmt.Sprint(a...),
-	)
-	return Print(s)
+func (l Logger) Printf(format string, a ...any) (n int, err error) {
+	return Printf(l.prependPrefixToString(format), a...)
 }
 
-func Logf(level LogLevel, format string, a ...any) (n int, err error) {
-	return Log(level, fmt.Sprintf(format, a...))
+func (l Logger) Debug(a ...any) (n int, err error) {
+	return Debug(l.prependPrefixToAnySlice(a)...)
 }
 
-func Debug(a ...any) (n int, err error) {
-	if logLevel >= LevelDebug {
-		return Log(LevelDebug, a...)
-	}
-	return 0, nil
+func (l Logger) Debugf(format string, a ...any) (n int, err error) {
+	return Debugf(l.prependPrefixToString(format), a...)
 }
 
-func Debugf(format string, a ...any) (n int, err error) {
-	if logLevel >= LevelDebug {
-		return Logf(LevelDebug, format, a...)
-	}
-	return 0, nil
+func (l Logger) Info(a ...any) (n int, err error) {
+	return Info(l.prependPrefixToAnySlice(a)...)
 }
 
-func Info(a ...any) (n int, err error) {
-	if logLevel >= LevelInfo {
-		return Log(LevelInfo, a...)
-	}
-	return 0, nil
+func (l Logger) Infof(format string, a ...any) (n int, err error) {
+	return Infof(l.prependPrefixToString(format), a...)
 }
 
-func Infof(format string, a ...any) (n int, err error) {
-	if logLevel >= LevelInfo {
-		return Logf(LevelInfo, format, a...)
-	}
-	return 0, nil
+func (l Logger) Warn(a ...any) (n int, err error) {
+	return Warn(l.prependPrefixToAnySlice(a)...)
 }
 
-func Warn(a ...any) (n int, err error) {
-	if logLevel >= LevelWarn {
-		return Log(LevelWarn, a...)
-	}
-	return 0, nil
+func (l Logger) Warnf(format string, a ...any) (n int, err error) {
+	return Warnf(l.prependPrefixToString(format), a...)
 }
 
-func Warnf(format string, a ...any) (n int, err error) {
-	if logLevel >= LevelWarn {
-		return Logf(LevelWarn, format, a...)
-	}
-	return 0, nil
+func (l Logger) Error(a ...any) (n int, err error) {
+	return Error(l.prependPrefixToAnySlice(a)...)
 }
 
-func Error(a ...any) (n int, err error) {
-	if logLevel >= LevelError {
-		return Log(LevelError, a...)
-	}
-	return 0, nil
+func (l Logger) Errorf(format string, a ...any) (n int, err error) {
+	return Errorf(l.prependPrefixToString(format), a...)
 }
 
-func Errorf(format string, a ...any) (n int, err error) {
-	if logLevel >= LevelError {
-		return Logf(LevelError, format, a...)
-	}
-	return 0, nil
+func (l Logger) Fatal(a ...any) (n int, err error) {
+	return Fatal(l.prependPrefixToAnySlice(a)...)
 }
 
-func Fatal(a ...any) (n int, err error) {
-	if logLevel >= LevelFatal {
-		return Log(LevelFatal, a...)
-	}
-	return 0, nil
-}
-
-func Fatalf(format string, a ...any) (n int, err error) {
-	if logLevel >= LevelFatal {
-		return Logf(LevelFatal, format, a...)
-	}
-	return 0, nil
+func (l Logger) Fatalf(format string, a ...any) (n int, err error) {
+	return Fatalf(l.prependPrefixToString(format), a...)
 }

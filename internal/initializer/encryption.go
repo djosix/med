@@ -10,12 +10,11 @@ import (
 
 	"github.com/djosix/med/internal"
 	"github.com/djosix/med/internal/helper"
-	"github.com/djosix/med/internal/logger"
 )
 
 func InitEncryption(secret []byte) Initializer {
 	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		logger.Debug("InitEncryption")
+		initLogger.Debug("Encryption")
 
 		secret := secret
 		if secret == nil {

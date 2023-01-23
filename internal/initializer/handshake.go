@@ -12,7 +12,6 @@ import (
 	"github.com/aead/ecdh"
 	"github.com/djosix/med/internal"
 	"github.com/djosix/med/internal/helper"
-	"github.com/djosix/med/internal/logger"
 	pb "github.com/djosix/med/internal/protobuf"
 	"github.com/djosix/med/internal/readwriter"
 	"google.golang.org/protobuf/proto"
@@ -20,7 +19,7 @@ import (
 
 func InitHandshake(privateKey ed25519.PrivateKey, trustedPublicKeys []ed25519.PublicKey) Initializer {
 	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		logger.Debug("InitHandshake")
+		initLogger.Debug("Handshake")
 
 		sharedSecret, err := Handshake(rw, privateKey, trustedPublicKeys)
 		if err != nil {

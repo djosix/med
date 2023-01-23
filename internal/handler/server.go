@@ -66,19 +66,21 @@ func GetServerOpts(cmd *cobra.Command, args []string) (*ServerOpts, error) {
 }
 
 func ServerMain(cmd *cobra.Command, args []string) {
+	logger := logger.NewLogger("ServerMain")
+
 	opts, err := GetServerOpts(cmd, args)
 	if err != nil {
-		logger.Print("error:", err)
+		logger.Error("GetServerOpts:", err)
 		return
 	}
 
 	err = ServerStart(cmd.Context(), opts)
 	if err != nil {
-		logger.Print("error:", err)
+		logger.Error("ServerStart:", err)
 		return
 	}
 
-	logger.Print("done")
+	logger.Debug("ServerMain Done")
 }
 
 func ServerStart(ctx context.Context, opts *ServerOpts) error {
@@ -99,11 +101,9 @@ func ServerStart(ctx context.Context, opts *ServerOpts) error {
 
 	switch opts.Mode {
 	case CommonFlagConnect:
-		logger.Print(CommonFlagConnect, opts.Endpoint)
 		return Connect(ctx, opts.Endpoint, handler)
 
 	case CommonFlagListen:
-		logger.Print(CommonFlagListen, opts.Endpoint)
 		return Listen(ctx, opts.Endpoint, handler, opts.MaxConnIfListen)
 
 	default:
@@ -112,12 +112,13 @@ func ServerStart(ctx context.Context, opts *ServerOpts) error {
 }
 
 func ServerHandler(ctx context.Context, rw io.ReadWriter) error {
-	logger.Print("ServerHandler BEGIN")
-	defer logger.Print("ServerHandler END")
+	logger := logger.NewLogger("ServerHandler")
+	logger.Debug("Begin")
+	defer logger.Debug("End")
 
 	var loop worker.Loop = worker.NewLoop(ctx, rw)
-	// loop.Start(worker.NewExampleProc("message from server"))
-	loop.Start(worker.NewServerExecProc())
+	loop.Start(worker.NewExampleProc("message from server"))
+	// loop.Start(worker.NewServerExecProc())
 	loop.Run()
 
 	{

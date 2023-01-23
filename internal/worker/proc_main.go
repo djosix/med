@@ -1,10 +1,55 @@
 package worker
 
 import (
+	"github.com/djosix/med/internal/helper"
 	"github.com/djosix/med/internal/logger"
 	pb "github.com/djosix/med/internal/protobuf"
-	"google.golang.org/protobuf/proto"
 )
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+type MedMainMsgKind byte
+
+const (
+	MedMainMsgKindStartReq   MedMainMsgKind = 0
+	MedMainMsgKindStartResp  MedMainMsgKind = 1
+	MedMainMsgKindRemoveReq  MedMainMsgKind = 2
+	MedMainMsgKindRemoveResp MedMainMsgKind = 3
+)
+
+type MedMainMsg struct {
+	Kind MedMainMsgKind
+	Data []byte
+}
+
+type MedProcKind byte
+
+const (
+	MedProcKindExec MedProcKind = 0
+)
+
+type MedMainStartReq struct {
+	ProcKind MedProcKind
+}
+
+type startReq struct {
+	ProcID uint32
+}
+
+func decodeMedMainMsg(data []byte) (*MedMainMsg, error) {
+	msg := MedMainMsg{}
+	err := helper.Decode(data, &msg)
+	return &msg, err
+}
+
+func encodeMedMainMsg(kind MedMainMsgKind, data []byte) []byte {
+	msg := MedMainMsg{Kind: kind, Data: data}
+	out, err := helper.Encode(&msg)
+	if err != nil {
+		panic(err)
+	}
+	return out
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -17,40 +62,48 @@ func NewClientMainProc() *ClientMainProc {
 func (p *ClientMainProc) Run(ctx ProcRunCtx) {
 
 	{
-		mainMsg := p.getStartReqMsg(pb.MedProcType_MedProcTypeExample)
-		content, err := proto.Marshal(mainMsg)
-		if err != nil {
-			panic("cannot marshal protobuf")
-		}
-
 		ctx.MsgOutCh <- &pb.MedMsg{
 			Type:    pb.MedMsgType_MedMsgTypeControl,
-			Content: content,
+			Content: encodeMedMainMsg(MedMainMsgKindStartReq, p.encodeStartReq(MedProcKindExec)),
 		}
-		logger.Print("sent msg to create example proc on server")
+		logger.Print("sent MedMainMsgKindStartReq")
 	}
 
 	{
-		msg := &pb.MedMainMsg{}
-
-		if err := proto.Unmarshal((<-ctx.MsgInCh).Content, msg); err != nil {
-			panic("cannot unmarshal protobuf")
+		msg := <-ctx.MsgInCh
+		logger.Print("XXX: msg:", msg)
+		mainMsg, err := decodeMedMainMsg(msg.Content)
+		if err != nil {
+			logger.Print("decodeMedMainMsg:", err)
 		}
-
-		if resp, ok := msg.Inner.(*pb.MedMainMsg_StartResp); ok {
-			logger.Print("recv resp from server:", resp)
+		switch mainMsg.Kind {
+		case MedMainMsgKindStartResp:
+			logger.Print("MedMainMsgKindStartResp")
+			startResp, err := p.decodeStartResp(mainMsg.Data)
+			if err != nil {
+				logger.Print("decodeStartResp:", err)
+				return
+			}
+			logger.Print("startResp:", startResp)
+		default:
+			logger.Print("unexpected MedMainMsgKind:", mainMsg.Kind)
+			return
 		}
 	}
 }
 
-func (p *ClientMainProc) getStartReqMsg(t pb.MedProcType) *pb.MedMainMsg {
-	return &pb.MedMainMsg{
-		Inner: &pb.MedMainMsg_StartReq{
-			StartReq: &pb.MedMainStartReq{
-				Type: t,
-			},
-		},
+func (p *ClientMainProc) encodeStartReq(procKind MedProcKind) (data []byte) {
+	data, err := helper.Encode(&MedMainStartReq{ProcKind: procKind})
+	if err != nil {
+		panic(err)
 	}
+	return data
+}
+
+func (p *ClientMainProc) decodeStartResp(content []byte) (*startReq, error) {
+	startResp := startReq{}
+	err := helper.Decode(content, &startResp)
+	return &startResp, err
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,22 +115,45 @@ func NewServerMainProc() *ServerMainProc {
 }
 
 func (p *ServerMainProc) Run(ctx ProcRunCtx) {
-	// wg := new(sync.WaitGroup)
+	{
+		msg := <-ctx.MsgInCh
+		logger.Print("XXX: msg:", msg)
+		mainMsg, err := decodeMedMainMsg(msg.Content)
+		if err != nil {
+			logger.Print("decodeMedMainMsg:", err)
+		}
+		switch mainMsg.Kind {
+		case MedMainMsgKindStartReq:
+			logger.Print("ok")
+			startReq, err := p.decodeStartReq(mainMsg.Data)
+			if err != nil {
+				logger.Print("decodeStartReq:", err)
+				return
+			}
+			logger.Print("startReq:", startReq)
+		default:
+			logger.Print("unexpected MedMainMsgKind:", mainMsg.Kind)
+			return
+		}
+	}
+	{
+		ctx.MsgOutCh <- &pb.MedMsg{
+			Type:    pb.MedMsgType_MedMsgTypeControl,
+			Content: encodeMedMainMsg(MedMainMsgKindStartResp, p.encodeStartResp(87)),
+		}
+		logger.Print("sent MedMainMsgKindStartResp")
+	}
+}
+func (p *ServerMainProc) encodeStartResp(procID uint32) (data []byte) {
+	data, err := helper.Encode(&startReq{ProcID: procID})
+	if err != nil {
+		panic(err)
+	}
+	return data
+}
 
-	// wg.Add(1)
-	// go func() {
-	// 	defer wg.Done()
-
-	// }()
-
-	// wg.Wait()
-
-	// for {
-	// 	switch msg := <-p.msgInCh; msg.Type {
-	// 	case pb.MedMsgType_MedMsgTypeControl:
-
-	// 	}
-	// }
-
-	// loop.Cancel()
+func (p *ServerMainProc) decodeStartReq(data []byte) (*MedMainStartReq, error) {
+	startReq := MedMainStartReq{}
+	err := helper.Decode(data, &startReq)
+	return &startReq, err
 }
