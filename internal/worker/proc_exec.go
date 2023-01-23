@@ -13,6 +13,7 @@ import (
 	"github.com/creack/pty"
 	"github.com/djosix/med/internal/helper"
 	"github.com/djosix/med/internal/logger"
+	log "github.com/djosix/med/internal/logger"
 	pb "github.com/djosix/med/internal/protobuf"
 	"golang.org/x/term"
 )
@@ -61,6 +62,8 @@ func NewClientExecProc(argv []string, tty bool) *ClientExecProc {
 }
 
 func (p *ClientExecProc) Run(ctx ProcRunCtx) {
+	logger := log.NewLogger("ClientExecProc")
+
 	ctx.PktOutCh <- &pb.Packet{
 		TargetID: ctx.ProcID,
 		Kind:     pb.PacketKind_PacketKindInfo,
@@ -75,13 +78,13 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 
 		// Save logger outputs instead of writing to stdout
 		loggerOutputBuf := bytes.NewBuffer([]byte{})
-		loggerTarget := logger.SwapTarget(loggerOutputBuf)
+		loggerTarget := log.SwapTarget(loggerOutputBuf)
 
 		defer func() {
 			_ = term.Restore(int(p.stdin.Fd()), oldState)
 
 			// Write saved logger outputs to stdout
-			logger.SwapTarget(loggerTarget)
+			log.SwapTarget(loggerTarget)
 			loggerOutputBuf.WriteTo(loggerTarget)
 		}()
 	}
@@ -159,7 +162,17 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 					logger.Warn("unknown pkt.Data for PacketKind_PacketKindCtrl:", pkt.Data)
 				}
 			case pb.PacketKind_PacketKindData:
-				p.stdout.Write(pkt.Data)
+				if len(pkt.Data) > 1 {
+					lastIdx := len(pkt.Data) - 1
+					switch data, fd := pkt.Data[:lastIdx], pkt.Data[lastIdx]; fd {
+					case 1:
+						p.stdout.Write(data)
+					case 2:
+						p.stderr.Write(data)
+					default:
+						logger.Warn("invalid output fd:", fd)
+					}
+				}
 			}
 		}
 	}()
@@ -204,62 +217,6 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 	wg.Wait()
 }
 
-type ChanWriter struct {
-	ctx context.Context
-	ch  chan []byte
-}
-
-func NewChanWriter(ctx context.Context) *ChanWriter {
-	return &ChanWriter{
-		ctx: ctx,
-		ch:  make(chan []byte, 1),
-	}
-}
-
-func (w *ChanWriter) Write(p []byte) (n int, err error) {
-	select {
-	case w.ch <- p:
-		return len(p), nil
-	case <-w.ctx.Done():
-		return 0, fmt.Errorf("broken")
-	}
-}
-
-type ChanReader struct {
-	ctx context.Context
-	ch  chan []byte
-	buf []byte
-}
-
-func NewChanReader(ctx context.Context) *ChanReader {
-	return &ChanReader{
-		ctx: ctx,
-		ch:  make(chan []byte, 1),
-		buf: []byte{},
-	}
-}
-
-func (r *ChanReader) Read(p []byte) (n int, err error) {
-	if len(r.buf) > 0 {
-		n = copy(p, r.buf)
-		r.buf = append([]byte{}, r.buf[n:]...)
-		return n, nil
-	}
-
-	select {
-	case buf := <-r.ch:
-		n = copy(p, buf)
-		buf = buf[n:]
-		if len(buf) > 0 {
-			r.buf = append(r.buf, buf...)
-		}
-		return n, nil
-	case <-r.ctx.Done():
-		return 0, fmt.Errorf("broken")
-	}
-
-}
-
 ///////////////////////////////////////////////////////////////////////////
 
 type ServerExecProc struct{}
@@ -294,64 +251,34 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 		return
 	}
 
-	cmd := exec.Command(spec.ARGV[0], spec.ARGV[1:]...)
-
 	ctx1, cancel1 := context.WithCancel(ctx)
 	defer cancel1()
 
 	wg := sync.WaitGroup{}
 
-	startWriter := func(file *os.File) chan<- []byte {
-		ch := make(chan []byte, 1)
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for {
-				select {
-				case buf := <-ch:
-					if buf == nil {
-						return // ch is closed
-					}
-					if _, err := file.Write(buf); err != nil {
-						logger.Debug("file.Write:", err)
-						return
-					}
-				case <-ctx1.Done():
-					return
-				}
-			}
-		}()
-
-		return ch
-	}
-
 	startReader := func(file *os.File) <-chan []byte {
+		logger := logger.NewLogger(fmt.Sprintf("reader[%v]", file.Fd()))
 		ch := make(chan []byte, 1)
-		r := helper.NewBreakableReader(file, 1024)
 
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			<-ctx1.Done()
-			r.BreakRead()
-			r.Cancel()
-			close(ch)
-		}()
+			defer cancel1()
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer r.Cancel()
-			defer close(ch)
+			logger.Debug("start")
+			defer logger.Debug("done")
+
 			buf := [1024]byte{}
 			for {
-				n, err := r.Read(buf[:])
+				logger.Debug("file.Read(buf[:])")
+				n, err := file.Read(buf[:])
+				logger.Debug("file.Read(buf[:]) done")
 				if err != nil || n == 0 {
 					return
 				}
+
 				select {
-				case ch <- buf[:n]:
+				case ch <- helper.Clone(buf[:n]):
 				case <-ctx1.Done():
 					return
 				}
@@ -362,21 +289,31 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 	}
 
 	startSender := func(fd byte, ch <-chan []byte) {
+		logger := logger.NewLogger(fmt.Sprintf("sender[%v]", fd))
+
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer cancel1()
+
+			logger.Debug("start")
+			defer logger.Debug("done")
 
 			for {
 				var buf []byte
 				select {
 				case buf = <-ch:
+					if buf == nil {
+						return // ch closed
+					}
 				case <-ctx1.Done():
 					return
 				}
 
+				logger.Debug("send", fd, buf)
 				pkt := &pb.Packet{
 					Kind: pb.PacketKind_PacketKindData,
-					Data: append([]byte{fd}, buf...),
+					Data: append(buf, fd),
 				}
 
 				select {
@@ -388,7 +325,8 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 		}()
 	}
 
-	var inputCh chan<- []byte
+	cmd := exec.Command(spec.ARGV[0], spec.ARGV[1:]...)
+	var inputFile *os.File
 
 	if spec.TTY {
 		ptmx, err := pty.Start(cmd)
@@ -398,108 +336,67 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 		}
 		defer func() { _ = ptmx.Close() }()
 
-		inputCh = startWriter(ptmx)
+		inputFile = ptmx
 		startSender(1, startReader(ptmx))
 	} else {
 		var (
-			err     error
-			stdinW  *os.File
-			stdoutR *os.File
-			stderrR *os.File
+			rPipes, wPipes [3]*os.File
+			err            error
 		)
-
-		cmd.Stdin, stdinW, err = os.Pipe()
-		if err != nil {
-			logger.Error("os.Pipe:", err)
-			return
+		for i := range rPipes {
+			if rPipes[i], wPipes[i], err = os.Pipe(); err != nil {
+				logger.Error("os.Pipe:", err)
+				return
+			}
 		}
-		stdoutR, cmd.Stdout, err = os.Pipe()
-		if err != nil {
-			logger.Error("os.Pipe:", err)
-			return
+		cmd.Stdin = rPipes[0]
+		cmd.Stdout = wPipes[1]
+		cmd.Stderr = wPipes[2]
+		cmd.SysProcAttr = &syscall.SysProcAttr{
+			Setsid: true,
 		}
-		stderrR, cmd.Stdin, err = os.Pipe()
-		if err != nil {
-			logger.Error("os.Pipe:", err)
-			return
-		}
-
-		if err := cmd.Start(); err != nil {
+		if err = cmd.Start(); err != nil {
 			logger.Error("cmd.Start:", err)
 			return
 		}
-
-		inputCh = startWriter(stdinW)
-		startSender(1, startReader(stdoutR))
-		startSender(2, startReader(stderrR))
+		inputFile = wPipes[0]
+		wPipes[1].Close()
+		wPipes[2].Close()
+		startSender(1, startReader(rPipes[1]))
+		startSender(2, startReader(rPipes[2]))
 	}
 
-	ptmxIn := make(chan []byte, 4)
-	ptmxOut := make(chan []byte, 4)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := cmd.Wait(); err != nil {
+			logger.Error("cmd.Wait():", err)
+		}
+		cancel1()
+	}()
 
 	wg.Add(1)
 	go func() {
-		logger := logger.NewLogger("ProcessKiller")
-		logger.Debug("start")
 		defer wg.Done()
+
+		logger := logger.NewLogger("killer")
+		logger.Debug("start")
 		defer logger.Debug("done")
+
 		<-ctx1.Done()
-		cmd.Process.Kill()
-		cmd.Process.Wait()
-	}()
-
-	wg.Add(1)
-	go func() {
-		logger := logger.NewLogger("loop[ptmxIn]")
-		logger.Debug("start")
-		defer wg.Done()
-		defer cancel1()
-		defer logger.Debug("done")
-		for {
-			var buf []byte
-			select {
-			case buf = <-ptmxIn:
-				if buf == nil {
-					return
-				}
-			case <-ctx1.Done():
-				return
-			}
-
-			if _, err := ptmx.Write(buf); err != nil {
-				logger.Print("cannot ptmx.Write:", err)
-				return
-			}
+		if err := cmd.Process.Kill(); err != nil {
+			logger.Error("cmd.Process.Kill():", err)
 		}
 	}()
 
 	wg.Add(1)
 	go func() {
-		logger := logger.NewLogger("loop[ptmx.Read]")
-		logger.Debug("start")
 		defer wg.Done()
 		defer cancel1()
-		defer close(ptmxOut)
-		defer logger.Debug("done")
-		buf := [1024]byte{}
-		for {
-			n, err := ptmx.Read(buf[:])
-			if err != nil || n == 0 {
-				logger.Debugf("ptmx.Read: n=[%v] err=[%v]", n, err)
-				return
-			}
-			ptmxOut <- append([]byte{}, buf[:n]...)
-		}
-	}()
+		defer inputFile.Close()
 
-	wg.Add(1)
-	go func() {
 		logger := logger.NewLogger("loop[PktInCh]")
 		logger.Debug("start")
-
-		defer wg.Done()
-		defer cancel1()
-		defer close(ptmxIn)
 		defer logger.Debug("done")
 
 		for {
@@ -515,13 +412,12 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 
 			switch pkt.Kind {
 			case pb.PacketKind_PacketKindData:
-				select {
-				case ptmxIn <- pkt.Data:
-				case <-ctx1.Done():
+				logger.Debug("pkt:", pkt)
+				if _, err := inputFile.Write(pkt.Data); err != nil {
+					logger.Debug("inputFile.Write:", err)
 					return
 				}
 			case pb.PacketKind_PacketKindInfo:
-				logger.Debug("got MedMsg<Info>")
 				info := ProcExecInfo{}
 				if err := helper.Decode(pkt.Data, &info); err != nil {
 					logger.Error("decode to info:", err)
@@ -529,48 +425,18 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 				}
 				switch info.Kind {
 				case ProcExecInfoKindWinSize:
-					winSize := pty.Winsize{}
-					if err := helper.Decode(info.Data, &winSize); err != nil {
-						logger.Error("decode to winSize:", err)
-						continue
-					}
-					if err := pty.Setsize(ptmx, &winSize); err != nil {
-						logger.Error("cannot set terminal size")
+					if spec.TTY {
+						winSize := pty.Winsize{}
+						if err := helper.Decode(info.Data, &winSize); err != nil {
+							logger.Error("decode to winSize:", err)
+							continue
+						}
+						logger.Debug("set winsize:", winSize)
+						if err := pty.Setsize(inputFile, &winSize); err != nil {
+							logger.Error("set winsize:", err)
+						}
 					}
 				}
-			}
-		}
-	}()
-
-	wg.Add(1)
-	go func() {
-		logger := logger.NewLogger("loop[ptmxOut]")
-		logger.Debug("start")
-
-		defer wg.Done()
-		defer cancel1()
-		defer logger.Debug("done")
-
-		for {
-			var buf []byte
-			select {
-			case buf = <-ptmxOut:
-				if buf == nil {
-					return
-				}
-			case <-ctx1.Done():
-				return
-			}
-
-			pkt := &pb.Packet{
-				Kind: pb.PacketKind_PacketKindData,
-				Data: buf,
-			}
-
-			select {
-			case ctx.PktOutCh <- pkt:
-			case <-ctx1.Done():
-				return
 			}
 		}
 	}()

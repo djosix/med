@@ -150,7 +150,7 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 			}
 
 			pkt.SourceID = procID
-			// pkt.TargetID = procID
+			pkt.TargetID = procID
 
 			select {
 			case loop.pktOutCh <- pkt:
