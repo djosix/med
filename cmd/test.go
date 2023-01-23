@@ -13,7 +13,7 @@ var testCmd = &cobra.Command{
 	Use: "test",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := mainForTest(cmd, args); err != nil {
-			logger.Log("error:", err)
+			logger.Print("error:", err)
 		}
 	},
 }
@@ -38,9 +38,9 @@ func mainForTest(cmd *cobra.Command, args []string) error {
 
 	// select {
 	// case <-done:
-	// 	logger.Log("done")
+	// 	logger.Show("done")
 	// default:
-	// 	logger.Log("default")
+	// 	logger.Show("default")
 	// }
 
 	// // Create arbitrary command.
@@ -90,10 +90,10 @@ func mainForTest(cmd *cobra.Command, args []string) error {
 	// }
 	// data, err := proto.Marshal(&message)
 	// if err != nil {
-	// 	logger.Log("error:", err)
+	// 	logger.Show("error:", err)
 	// 	return
 	// }
-	// logger.Log("Message:", data)
+	// logger.Show("Message:", data)
 	// data := []byte{}
 	// for len(data) < 1000 {
 	// 	data = append(data, byte(len(data)%256))
@@ -102,8 +102,8 @@ func mainForTest(cmd *cobra.Command, args []string) error {
 	// encoded := []byte{}
 	// encoded = snappy.Encode(encoded, data)
 
-	// logger.Log("src:", len(data))
-	// logger.Log("dst:", len(encoded))
+	// logger.Show("src:", len(data))
+	// logger.Show("dst:", len(encoded))
 
 	return nil
 }

@@ -14,7 +14,7 @@ import (
 
 func InitVerify(hash []byte) Initializer {
 	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		logger.Log("init: verify")
+		logger.Debug("InitVerify")
 
 		ctxOut = ctx
 		rwOut = rw
@@ -26,7 +26,7 @@ func InitVerify(hash []byte) Initializer {
 
 func InitGetVerified(hash []byte) Initializer {
 	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		logger.Log("init: get verified")
+		logger.Debug("InitGetVerified")
 
 		ctxOut = ctx
 		rwOut = rw
@@ -149,7 +149,7 @@ func GetVerified(rw io.ReadWriter, hash []byte) error {
 	case StatusReject, StatusVerify:
 		return rejectErr
 	default:
-		logger.Log("unknown remote status:", status)
+		logger.Print("unknown remote status:", status)
 		return statusErr
 	}
 }

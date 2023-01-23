@@ -27,7 +27,7 @@ func (p *ClientMainProc) Run(ctx ProcRunCtx) {
 			Type:    pb.MedMsgType_MedMsgTypeControl,
 			Content: content,
 		}
-		logger.Log("sent msg to create example proc on server")
+		logger.Print("sent msg to create example proc on server")
 	}
 
 	{
@@ -38,7 +38,7 @@ func (p *ClientMainProc) Run(ctx ProcRunCtx) {
 		}
 
 		if resp, ok := msg.Inner.(*pb.MedMainMsg_StartResp); ok {
-			logger.Log("recv resp from server:", resp)
+			logger.Print("recv resp from server:", resp)
 		}
 	}
 }

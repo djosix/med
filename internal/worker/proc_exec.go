@@ -80,7 +80,7 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 		go func() {
 			defer wg.Done()
 			defer ctx.Cancel()
-			defer logger.Log("done SIGWINCH loop")
+			defer logger.Print("done SIGWINCH loop")
 			for {
 				select {
 				case <-sigCh:
@@ -89,12 +89,12 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 				}
 				winSize, err := pty.GetsizeFull(p.stdin)
 				if err != nil {
-					logger.Log("cannot get winSize")
+					logger.Print("cannot get winSize")
 					continue
 				}
 				data, err := helper.Encode(winSize)
 				if err != nil {
-					logger.Log("cannot encode winSize")
+					logger.Print("cannot encode winSize")
 					continue
 				}
 				ctrl := ExecProcCtrl{
@@ -103,7 +103,7 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 				}
 				data, err = helper.Encode(ctrl)
 				if err != nil {
-					logger.Log("cannot encode ctrl")
+					logger.Print("cannot encode ctrl")
 					continue
 				}
 				ctx.MsgOutCh <- &pb.MedMsg{
@@ -119,7 +119,7 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 	go func() {
 		defer wg.Done()
 		defer localCancel()
-		defer logger.Log("done ctx.MsgInCh loop")
+		defer logger.Print("done ctx.MsgInCh loop")
 		for {
 			var msg *pb.MedMsg
 			select {
@@ -148,12 +148,12 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 	go func() {
 		defer wg.Done()
 		defer localCancel()
-		defer logger.Log("done stdin read loop")
+		defer logger.Print("done stdin read loop")
 		buf := make([]byte, 1024)
 		for {
 			n, err := p.stdinReader.Read(buf)
 			if err != nil || n == 0 {
-				logger.Log("stdin:", err)
+				logger.Print("stdin:", err)
 				return
 			}
 			msg := &pb.MedMsg{
@@ -194,7 +194,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 
 	ptmx, err := pty.Start(c)
 	if err != nil {
-		logger.Log("error:", err)
+		logger.Print("error:", err)
 		return
 	}
 	defer func() { _ = ptmx.Close() }()
@@ -208,7 +208,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		defer logger.Log("done kill")
+		defer logger.Print("done kill")
 		<-localCtx.Done()
 		c.Process.Kill()
 		c.Process.Wait()
@@ -218,7 +218,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 	go func() {
 		defer wg.Done()
 		defer localCancel()
-		defer logger.Log("done ptmxIn loop")
+		defer logger.Print("done ptmxIn loop")
 		for {
 			var buf []byte
 			select {
@@ -231,7 +231,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 			}
 
 			if _, err := ptmx.Write(buf); err != nil {
-				logger.Log("cannot ptmx.Write:", err)
+				logger.Print("cannot ptmx.Write:", err)
 				return
 			}
 		}
@@ -242,16 +242,16 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 		defer wg.Done()
 		defer localCancel()
 		defer close(ptmxOut)
-		defer logger.Log("done ptmx.Read loop")
+		defer logger.Print("done ptmx.Read loop")
 		buf := [1024]byte{}
 		for {
 			n, err := ptmx.Read(buf[:])
 			if err != nil {
-				logger.Log("cannot ptmx.Read:", err)
+				logger.Print("cannot ptmx.Read:", err)
 				return
 			}
 			if n == 0 {
-				logger.Log("empty from ptmx.Read")
+				logger.Print("empty from ptmx.Read")
 				return
 			}
 			ptmxOut <- append([]byte{}, buf[:n]...)
@@ -263,7 +263,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 		defer wg.Done()
 		defer localCancel()
 		defer close(ptmxIn)
-		defer logger.Log("done ctx.MsgInCh loop")
+		defer logger.Print("done ctx.MsgInCh loop")
 
 		for {
 			var msg *pb.MedMsg
@@ -284,21 +284,21 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 					return
 				}
 			case pb.MedMsgType_MedMsgTypeControl:
-				logger.Log("MedMsgType_MedMsgTypeControl")
+				logger.Print("MedMsgType_MedMsgTypeControl")
 				ctrl := ExecProcCtrl{}
 				if err := helper.Decode(msg.Content, &ctrl); err != nil {
-					logger.Log("error:", err)
+					logger.Print("error:", err)
 					continue
 				}
 				switch ctrl.Kind {
 				case ExecProcCtrlKindWinSize:
 					winSize := pty.Winsize{}
 					if err := helper.Decode(ctrl.Data, &winSize); err != nil {
-						logger.Log("error:", err)
+						logger.Print("error:", err)
 						continue
 					}
 					if err := pty.Setsize(ptmx, &winSize); err != nil {
-						logger.Log("cannot set terminal size")
+						logger.Print("cannot set terminal size")
 					}
 				}
 			}
@@ -309,7 +309,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 	go func() {
 		defer wg.Done()
 		defer localCancel()
-		defer logger.Log("done ptmxOut loop")
+		defer logger.Print("done ptmxOut loop")
 		for {
 			var buf []byte
 			select {
@@ -334,9 +334,9 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 		}
 	}()
 
-	logger.Log("start wg.Wait()")
+	logger.Print("start wg.Wait()")
 	wg.Wait()
-	logger.Log("done wg.Wait()")
+	logger.Print("done wg.Wait()")
 
 	ctx.MsgOutCh <- &pb.MedMsg{
 		Type:    pb.MedMsgType_MedMsgTypeControl,

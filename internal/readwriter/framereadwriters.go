@@ -184,7 +184,7 @@ func (f *DebugFrameReadWriter) ReadFrame() (frame []byte, err error) {
 	defer f.mu.Unlock()
 
 	frame, err = f.inner.ReadFrame()
-	logger.Log(">frame", f.getMsg(frame, err))
+	logger.Print(">frame", f.getMsg(frame, err))
 
 	return
 }
@@ -194,7 +194,7 @@ func (f *DebugFrameReadWriter) WriteFrame(frame []byte) (err error) {
 	defer f.mu.Unlock()
 
 	err = f.inner.WriteFrame(frame)
-	logger.Log("<frame", f.getMsg(frame, err))
+	logger.Print("<frame", f.getMsg(frame, err))
 
 	return
 }

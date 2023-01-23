@@ -43,28 +43,28 @@ func TestBreakableReader(t *testing.T) {
 
 	breakReadLater := func(d time.Duration) {
 		time.Sleep(d)
-		logger.Log("Break Read")
+		logger.Print("Break Read")
 		br.BreakRead()
 	}
 
 	testRead := func() ([]byte, error) {
 		buf := make([]byte, 32)
-		logger.Log("Test Read")
+		logger.Print("Test Read")
 		n, err := br.Read(buf)
-		logger.Logf("Test Read Done: buf=%v err=%v", buf[:n], err)
+		logger.Printf("Test Read Done: buf=%v err=%v", buf[:n], err)
 		return buf[:n], err
 	}
 
 	flushReadLater := func(d time.Duration) {
 		time.Sleep(d)
-		logger.Log("Flush Read")
+		logger.Print("Flush Read")
 		r.FlushRead()
 	}
 
 	go breakReadLater(100 * time.Millisecond)
 	if buf, err := testRead(); true {
 		if bytes.Equal(buf, []byte{}) && err != nil {
-			logger.Log("ok")
+			logger.Print("ok")
 		} else {
 			t.Error(buf, err)
 		}
@@ -73,7 +73,7 @@ func TestBreakableReader(t *testing.T) {
 	go flushReadLater(100 * time.Millisecond)
 	if buf, err := testRead(); true {
 		if bytes.Equal(buf, []byte{0, 1, 2, 3}) && err == nil {
-			logger.Log("ok")
+			logger.Print("ok")
 		} else {
 			t.Error(buf, err)
 		}
@@ -82,7 +82,7 @@ func TestBreakableReader(t *testing.T) {
 	go flushReadLater(100 * time.Millisecond)
 	if buf, err := testRead(); true {
 		if bytes.Equal(buf, []byte{4, 5, 6, 7}) && err == nil {
-			logger.Log("ok")
+			logger.Print("ok")
 		} else {
 			t.Error(buf, err)
 		}

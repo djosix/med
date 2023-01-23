@@ -20,7 +20,7 @@ import (
 
 func InitHandshake(privateKey ed25519.PrivateKey, trustedPublicKeys []ed25519.PublicKey) Initializer {
 	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		logger.Log("init: kex handshake")
+		logger.Debug("InitHandshake")
 
 		sharedSecret, err := Handshake(rw, privateKey, trustedPublicKeys)
 		if err != nil {

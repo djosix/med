@@ -58,7 +58,7 @@ func (rw *DebugReadWriter) Read(b []byte) (n int, err error) {
 	defer rw.mu.Unlock()
 
 	n, err = rw.inner.Read(b)
-	logger.Log(">", rw.getMsg(b[:n], err))
+	logger.Print(">", rw.getMsg(b[:n], err))
 
 	return
 }
@@ -68,7 +68,7 @@ func (rw *DebugReadWriter) Write(b []byte) (n int, err error) {
 	defer rw.mu.Unlock()
 
 	n, err = rw.inner.Write(b)
-	logger.Log("<", rw.getMsg(b[:n], err))
+	logger.Print("<", rw.getMsg(b[:n], err))
 
 	return
 }
