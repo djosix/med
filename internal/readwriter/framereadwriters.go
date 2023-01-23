@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/djosix/med/internal/helper"
+	"github.com/djosix/med/internal/logger"
 	"github.com/golang/snappy"
 )
 
@@ -183,7 +184,7 @@ func (f *DebugFrameReadWriter) ReadFrame() (frame []byte, err error) {
 	defer f.mu.Unlock()
 
 	frame, err = f.inner.ReadFrame()
-	fmt.Println(">frame", f.getMsg(frame, err))
+	logger.Log(">frame", f.getMsg(frame, err))
 
 	return
 }
@@ -193,7 +194,7 @@ func (f *DebugFrameReadWriter) WriteFrame(frame []byte) (err error) {
 	defer f.mu.Unlock()
 
 	err = f.inner.WriteFrame(frame)
-	fmt.Println("<frame", f.getMsg(frame, err))
+	logger.Log("<frame", f.getMsg(frame, err))
 
 	return
 }

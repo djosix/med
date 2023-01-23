@@ -3,9 +3,9 @@ package handler
 import (
 	"context"
 	"io"
-	"log"
 
 	"github.com/djosix/med/internal/initializer"
+	"github.com/djosix/med/internal/logger"
 )
 
 type Handler = func(ctx context.Context, rw io.ReadWriter) error
@@ -18,7 +18,7 @@ func BindInitializers(h Handler, inits ...initializer.Initializer) Handler {
 				return err
 			}
 		}
-		log.Println("initialized")
+		logger.Log("initialized")
 		return h(ctx, rw)
 	}
 }

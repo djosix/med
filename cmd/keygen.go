@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/djosix/med/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -36,13 +37,13 @@ var keygenCmd = &cobra.Command{
 			privateKeyPath := fmt.Sprintf("%s.key", path)
 			fmt.Printf("privateKey[%d] = %s\n", i, privateKeyPath)
 			if err := os.WriteFile(privateKeyPath, []byte(hex.EncodeToString(privateKey)+"\n"), 0600); err != nil {
-				fmt.Println("error:", err)
+				logger.Log("error:", err)
 			}
 
 			publicKeyPath := fmt.Sprintf("%s.pub", path)
 			fmt.Printf("publicKey[%d] = %s\n", i, publicKeyPath)
 			if err := os.WriteFile(publicKeyPath, []byte(hex.EncodeToString(publicKey)+"\n"), 0622); err != nil {
-				fmt.Println("error:", err)
+				logger.Log("error:", err)
 			}
 		}
 

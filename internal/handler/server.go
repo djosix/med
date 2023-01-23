@@ -2,13 +2,12 @@ package handler
 
 import (
 	"context"
-	"fmt"
 	"io"
-	"log"
 	"time"
 
 	"github.com/djosix/med/internal"
 	"github.com/djosix/med/internal/initializer"
+	"github.com/djosix/med/internal/logger"
 	"github.com/djosix/med/internal/worker"
 
 	"github.com/spf13/cobra"
@@ -69,17 +68,17 @@ func GetServerOpts(cmd *cobra.Command, args []string) (*ServerOpts, error) {
 func ServerMain(cmd *cobra.Command, args []string) {
 	opts, err := GetServerOpts(cmd, args)
 	if err != nil {
-		log.Fatalln("error:", err)
+		logger.Log("error:", err)
 		return
 	}
 
 	err = ServerStart(cmd.Context(), opts)
 	if err != nil {
-		log.Fatalln("error:", err)
+		logger.Log("error:", err)
 		return
 	}
 
-	log.Println("done")
+	logger.Log("done")
 }
 
 func ServerStart(ctx context.Context, opts *ServerOpts) error {
@@ -100,11 +99,11 @@ func ServerStart(ctx context.Context, opts *ServerOpts) error {
 
 	switch opts.Mode {
 	case CommonFlagConnect:
-		log.Println(CommonFlagConnect, opts.Endpoint)
+		logger.Log(CommonFlagConnect, opts.Endpoint)
 		return Connect(ctx, opts.Endpoint, handler)
 
 	case CommonFlagListen:
-		log.Println(CommonFlagListen, opts.Endpoint)
+		logger.Log(CommonFlagListen, opts.Endpoint)
 		return Listen(ctx, opts.Endpoint, handler, opts.MaxConnIfListen)
 
 	default:
@@ -113,8 +112,8 @@ func ServerStart(ctx context.Context, opts *ServerOpts) error {
 }
 
 func ServerHandler(ctx context.Context, rw io.ReadWriter) error {
-	log.Println("ServerHandler BEGIN")
-	defer log.Println("ServerHandler END")
+	logger.Log("ServerHandler BEGIN")
+	defer logger.Log("ServerHandler END")
 
 	var loop worker.Loop = worker.NewLoop(ctx, rw)
 	// loop.Start(worker.NewExampleProc("message from server"))
@@ -125,7 +124,7 @@ func ServerHandler(ctx context.Context, rw io.ReadWriter) error {
 		buf := []byte("server loop closed")
 		if _, err := rw.Write(buf); err == nil {
 			if n, err := rw.Read(buf); err == nil {
-				fmt.Println("remote:", string(buf[:n]))
+				logger.Log("remote:", string(buf[:n]))
 			}
 		}
 	}

@@ -70,9 +70,9 @@ func TestPlainFramedReaderWriter(t *testing.T) {
 
 	rw := NewPlainFrameReadWriter(inner)
 	frame, err := rw.ReadFrame()
-	// fmt.Println(buf)
-	// fmt.Println(inner.ReadBuf)
-	// fmt.Println(frame)
+	// logger.Log(buf)
+	// logger.Log(inner.ReadBuf)
+	// logger.Log(frame)
 
 	if err != nil {
 		t.Errorf("error: %v", err)

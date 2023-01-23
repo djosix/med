@@ -2,8 +2,9 @@ package handler
 
 import (
 	"context"
-	"log"
 	"net"
+
+	"github.com/djosix/med/internal/logger"
 )
 
 func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) error {
@@ -13,8 +14,8 @@ func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) 
 	}
 	defer listener.Close()
 
-	gateCh := make(chan struct{}, maxConn)
-	connCh := make(chan net.Conn, 4)
+	gateCh := make(chan struct{}, 9)
+	connCh := make(chan net.Conn, 0)
 
 	go func() {
 		for len(gateCh) < cap(gateCh) {
@@ -24,7 +25,7 @@ func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) 
 			<-gateCh
 			conn, err := listener.Accept()
 			if err != nil {
-				log.Fatalln(err)
+				logger.Log(err)
 				continue
 			}
 			connCh <- conn
@@ -36,11 +37,11 @@ func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) 
 		case conn := <-connCh:
 			go func(conn net.Conn, gateCh chan struct{}) {
 				defer conn.Close()
-				log.Println("accept:", conn.RemoteAddr())
+				logger.Log("accept:", conn.RemoteAddr())
 
 				ctx := context.WithValue(ctx, "conn", conn)
 				if err := handler(ctx, conn); err != nil {
-					log.Println("error:", conn.RemoteAddr(), err)
+					logger.Log("error:", conn.RemoteAddr(), err)
 				}
 
 				gateCh <- struct{}{}

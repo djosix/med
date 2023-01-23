@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"sync"
+
+	"github.com/djosix/med/internal/logger"
 )
 
 type FullReadWriter struct {
@@ -56,7 +58,7 @@ func (rw *DebugReadWriter) Read(b []byte) (n int, err error) {
 	defer rw.mu.Unlock()
 
 	n, err = rw.inner.Read(b)
-	fmt.Println(">", rw.getMsg(b[:n], err))
+	logger.Log(">", rw.getMsg(b[:n], err))
 
 	return
 }
@@ -66,7 +68,7 @@ func (rw *DebugReadWriter) Write(b []byte) (n int, err error) {
 	defer rw.mu.Unlock()
 
 	n, err = rw.inner.Write(b)
-	fmt.Println("<", rw.getMsg(b[:n], err))
+	logger.Log("<", rw.getMsg(b[:n], err))
 
 	return
 }

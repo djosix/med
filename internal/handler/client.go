@@ -3,10 +3,10 @@ package handler
 import (
 	"context"
 	"io"
-	"log"
 
 	"github.com/djosix/med/internal"
 	"github.com/djosix/med/internal/initializer"
+	"github.com/djosix/med/internal/logger"
 	"github.com/djosix/med/internal/worker"
 	"github.com/spf13/cobra"
 )
@@ -69,17 +69,17 @@ func GetClientOpts(cmd *cobra.Command, args []string) (*ClientOpts, error) {
 func ClientMain(cmd *cobra.Command, args []string) {
 	opts, err := GetClientOpts(cmd, args)
 	if err != nil {
-		log.Fatalln("error:", err)
+		logger.Log("error:", err)
 		return
 	}
 
 	err = ClientStart(cmd.Context(), opts)
 	if err != nil {
-		log.Fatalln("error:", err)
+		logger.Log("error:", err)
 		return
 	}
 
-	log.Println("done")
+	logger.Log("done")
 }
 
 func ClientStart(ctx context.Context, opts *ClientOpts) error {
@@ -100,11 +100,11 @@ func ClientStart(ctx context.Context, opts *ClientOpts) error {
 
 	switch opts.Mode {
 	case CommonFlagConnect:
-		log.Println(CommonFlagConnect, opts.Endpoint)
+		logger.Log(CommonFlagConnect, opts.Endpoint)
 		return Connect(ctx, opts.Endpoint, handler)
 
 	case CommonFlagListen:
-		log.Println(CommonFlagListen, opts.Endpoint)
+		logger.Log(CommonFlagListen, opts.Endpoint)
 		return Listen(ctx, opts.Endpoint, handler, 1)
 
 	default:
@@ -114,8 +114,8 @@ func ClientStart(ctx context.Context, opts *ClientOpts) error {
 
 func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
 
-	log.Println("ClientHandler BEGIN")
-	defer log.Println("ClientHandler END")
+	logger.Log("ClientHandler BEGIN")
+	defer logger.Log("ClientHandler END")
 
 	var loop worker.Loop = worker.NewLoop(ctx, rw)
 	// loop.Start(worker.NewExampleProc("message from client"))
@@ -126,7 +126,7 @@ func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
 	// 	buf := []byte("client loop closed")
 	// 	if _, err := rw.Write(buf); err == nil {
 	// 		if n, err := rw.Read(buf); err == nil {
-	// 			fmt.Println("remote:", string(buf[:n]))
+	// 			logger.Log("remote:", string(buf[:n]))
 	// 		}
 	// 	}
 	// }

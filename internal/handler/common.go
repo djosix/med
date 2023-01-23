@@ -34,7 +34,7 @@ func InitCommonFlags(cmd *cobra.Command) {
 
 	flags.StringP(CommonFlagConnect, "c", "", "target to connect")
 	flags.StringP(CommonFlagListen, "l", "", "endpoint to listen on")
-	flags.IntP(CommonFlagMaxConn, "C", 1, "max number of connections")
+	flags.IntP(CommonFlagMaxConn, "C", 1024, "max number of connections")
 	flags.StringP(CommonFlagPassword, "w", "", "the server password")
 	flags.BoolP(CommonFlagPasswordPrompt, "W", false, "prompt for the server password")
 	flags.StringP(CommonFlagSecret, "s", "", "shared secret")

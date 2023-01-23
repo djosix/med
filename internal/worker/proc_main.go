@@ -1,8 +1,7 @@
 package worker
 
 import (
-	"fmt"
-
+	"github.com/djosix/med/internal/logger"
 	pb "github.com/djosix/med/internal/protobuf"
 	"google.golang.org/protobuf/proto"
 )
@@ -28,7 +27,7 @@ func (p *ClientMainProc) Run(ctx ProcRunCtx) {
 			Type:    pb.MedMsgType_MedMsgTypeControl,
 			Content: content,
 		}
-		fmt.Println("sent msg to create example proc on server")
+		logger.Log("sent msg to create example proc on server")
 	}
 
 	{
@@ -39,7 +38,7 @@ func (p *ClientMainProc) Run(ctx ProcRunCtx) {
 		}
 
 		if resp, ok := msg.Inner.(*pb.MedMainMsg_StartResp); ok {
-			fmt.Println("recv resp from server:", resp)
+			logger.Log("recv resp from server:", resp)
 		}
 	}
 }

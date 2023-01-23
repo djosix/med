@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/djosix/med/internal/helper"
+	"github.com/djosix/med/internal/logger"
 	pb "github.com/djosix/med/internal/protobuf"
 	"github.com/djosix/med/internal/readwriter"
 	"google.golang.org/protobuf/proto"
@@ -86,7 +86,6 @@ func (loop *LoopImpl) Run() {
 	loop.wg.Wait()
 
 	if conn, ok := loop.ctx.Value("conn").(net.Conn); ok {
-		fmt.Println("helper.RefreshIO(conn)")
 		helper.RefreshIO(conn)
 	} else {
 		panic("cannot find conn in ctx")
@@ -110,7 +109,7 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 	loop.wg.Add(1)
 	go func() {
 		defer loop.wg.Done()
-		defer fmt.Println("done msgOutCh loop of proc", procID)
+		defer logger.Log("done msgOutCh loop of proc", procID)
 		for {
 			var msg *pb.MedMsg
 			select {
@@ -183,7 +182,6 @@ func (loop *LoopImpl) Cancel() {
 	loop.cancel()
 
 	if conn, ok := loop.ctx.Value("conn").(net.Conn); ok {
-		fmt.Println("helper.BreakIO(conn)")
 		helper.BreakIO(conn)
 	} else {
 		panic("cannot find conn in ctx")
@@ -191,20 +189,20 @@ func (loop *LoopImpl) Cancel() {
 }
 
 func (loop *LoopImpl) loopRead() {
-	defer log.Println("done loopRead")
+	defer logger.Log("done loopRead")
 	for {
 		frame, err := loop.frameRw.ReadFrame()
 		if err != nil {
-			log.Println("cannot read frame:", err)
+			logger.Log("cannot read frame:", err)
 			return
 		}
 		inPkt := pb.MedPkt{}
 		if err = proto.Unmarshal(frame, &inPkt); err != nil {
-			log.Println("cannot unmarshal frame to MedPkt:", err)
+			logger.Log("cannot unmarshal frame to MedPkt:", err)
 			continue
 		}
 		if inPkt.Message.Type == pb.MedMsgType_MedMsgTypeError {
-			fmt.Println("readLoop:", "got error pkt:", inPkt.String())
+			logger.Log("readLoop:", "got error pkt:", inPkt.String())
 			continue
 		}
 		loop.pktInCh <- &inPkt
@@ -212,7 +210,7 @@ func (loop *LoopImpl) loopRead() {
 }
 
 func (loop *LoopImpl) loopDispatch() {
-	defer log.Println("done loopDispatch")
+	defer logger.Log("done loopDispatch")
 
 	dispatchToProc := func(pkt *pb.MedPkt) error {
 		loop.procLock.Lock()
@@ -239,7 +237,7 @@ func (loop *LoopImpl) loopDispatch() {
 		select {
 		case inPkt := <-loop.pktInCh:
 			if inPkt == nil {
-				log.Println("MedMsg from loop.inPktCh is nil")
+				logger.Log("MedMsg from loop.inPktCh is nil")
 				return
 			}
 			if err := dispatchToProc(inPkt); err != nil {
@@ -259,12 +257,12 @@ func (loop *LoopImpl) loopDispatch() {
 }
 
 func (loop *LoopImpl) loopWrite() {
-	defer log.Println("done loopWrite")
+	defer logger.Log("done loopWrite")
 	for {
 		select {
 		case msg := <-loop.pktOutCh:
 			if msg == nil {
-				log.Println("MedPkt from loop.outPktCh is nil")
+				logger.Log("MedPkt from loop.outPktCh is nil")
 				return
 			}
 			buf, err := proto.Marshal(msg)
@@ -274,7 +272,7 @@ func (loop *LoopImpl) loopWrite() {
 
 			err = loop.frameRw.WriteFrame(buf)
 			if err != nil {
-				log.Println(err)
+				logger.Log(err)
 				return
 			}
 		case <-loop.ctx.Done():

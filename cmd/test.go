@@ -5,8 +5,8 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/djosix/med/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -15,7 +15,7 @@ var testCmd = &cobra.Command{
 	Use: "test",
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := mainForTest(cmd, args); err != nil {
-			fmt.Println("error:", err)
+			logger.Log("error:", err)
 		}
 	},
 }
@@ -56,13 +56,13 @@ func mainForTest(cmd *cobra.Command, args []string) error {
 	// _ = brCancel
 
 	// go func() {
-	// 	fmt.Println("wait")
+	// 	logger.Log("wait")
 	// 	time.Sleep(1 * time.Second)
-	// 	fmt.Println("br.BreakRead()")
+	// 	logger.Log("br.BreakRead()")
 	// 	br.BreakRead()
-	// 	fmt.Println("wait")
+	// 	logger.Log("wait")
 	// 	time.Sleep(1 * time.Second)
-	// 	fmt.Println("br.BreakRead()")
+	// 	logger.Log("br.BreakRead()")
 	// 	br.BreakRead()
 	// }()
 
@@ -70,7 +70,7 @@ func mainForTest(cmd *cobra.Command, args []string) error {
 
 	// testRead := func() {
 	// 	if n, err := br.Read(buf); true {
-	// 		fmt.Println(fmt.Sprintf("br.Read => n=%v, err=%v", buf[:n], err))
+	// 		logger.Log(fmt.Sprintf("br.Read => n=%v, err=%v", buf[:n], err))
 	// 	}
 	// }
 	// testRead()
@@ -87,9 +87,9 @@ func mainForTest(cmd *cobra.Command, args []string) error {
 
 	// select {
 	// case <-done:
-	// 	fmt.Println("done")
+	// 	logger.Log("done")
 	// default:
-	// 	fmt.Println("default")
+	// 	logger.Log("default")
 	// }
 
 	// // Create arbitrary command.
@@ -139,10 +139,10 @@ func mainForTest(cmd *cobra.Command, args []string) error {
 	// }
 	// data, err := proto.Marshal(&message)
 	// if err != nil {
-	// 	fmt.Println("error:", err)
+	// 	logger.Log("error:", err)
 	// 	return
 	// }
-	// fmt.Println("Message:", data)
+	// logger.Log("Message:", data)
 	// data := []byte{}
 	// for len(data) < 1000 {
 	// 	data = append(data, byte(len(data)%256))
@@ -151,8 +151,8 @@ func mainForTest(cmd *cobra.Command, args []string) error {
 	// encoded := []byte{}
 	// encoded = snappy.Encode(encoded, data)
 
-	// fmt.Println("src:", len(data))
-	// fmt.Println("dst:", len(encoded))
+	// logger.Log("src:", len(data))
+	// logger.Log("dst:", len(encoded))
 
 	return nil
 }

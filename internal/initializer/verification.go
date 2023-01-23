@@ -6,15 +6,15 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/djosix/med/internal/helper"
+	"github.com/djosix/med/internal/logger"
 	"github.com/djosix/med/internal/readwriter"
 )
 
 func InitVerify(hash []byte) Initializer {
 	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		log.Println("init: verify")
+		logger.Log("init: verify")
 
 		ctxOut = ctx
 		rwOut = rw
@@ -26,7 +26,7 @@ func InitVerify(hash []byte) Initializer {
 
 func InitGetVerified(hash []byte) Initializer {
 	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
-		log.Println("init: get verified")
+		logger.Log("init: get verified")
 
 		ctxOut = ctx
 		rwOut = rw
@@ -149,7 +149,7 @@ func GetVerified(rw io.ReadWriter, hash []byte) error {
 	case StatusReject, StatusVerify:
 		return rejectErr
 	default:
-		log.Fatalln("unknown remote status:", status)
+		logger.Log("unknown remote status:", status)
 		return statusErr
 	}
 }

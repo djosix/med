@@ -4,18 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"sync"
 )
-
-var BreakableStdin BreakableReader
-var onceCreateBreakableStdin sync.Once
-
-func init() {
-	onceCreateBreakableStdin.Do(func() {
-		BreakableStdin = NewBreakableReader(os.Stdin, 1024)
-	})
-}
 
 type BreakableReader interface {
 	Read(p []byte) (n int, err error)
@@ -54,6 +44,13 @@ func NewBreakableReader(r io.Reader, bufSize int) *BreakableReaderImpl {
 	nextCh := make(chan struct{}, 1)
 	bufCh := make(chan []byte, 1)
 	errCh := make(chan error, 1)
+
+	go func() {
+		<-ctx.Done()
+		br.brkMu.Lock()
+		close(br.brkCh)
+		br.brkMu.Unlock()
+	}()
 
 	go func() {
 		nextCh <- struct{}{}
@@ -170,6 +167,11 @@ func (r *BreakableReaderImpl) Read(p []byte) (n int, err error) {
 func (r *BreakableReaderImpl) BreakRead() {
 	r.brkMu.Lock()
 	defer r.brkMu.Unlock()
-	close(r.brkCh)
-	r.brkCh = make(chan struct{})
+	select {
+	case <-r.ctx.Done():
+		return
+	default:
+		close(r.brkCh)
+		r.brkCh = make(chan struct{})
+	}
 }
