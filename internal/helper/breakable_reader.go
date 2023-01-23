@@ -10,23 +10,24 @@ import (
 type BreakableReader interface {
 	Read(p []byte) (n int, err error)
 	BreakRead()
+	Cancel()
 }
 
 type BreakableReaderImpl struct {
 	ctx    context.Context
 	cancel context.CancelFunc
-	reqCh  chan *readBufReq
+	reqCh  chan *brReadBufReq
 	reqMu  sync.Mutex
 	brkCh  chan struct{}
 	brkMu  sync.Mutex
 }
 
-type readBufReq struct {
+type brReadBufReq struct {
 	buf    []byte
-	respCh chan<- *readBufResp
+	respCh chan<- *brReadBufResp
 }
 
-type readBufResp struct {
+type brReadBufResp struct {
 	buf []byte
 	err error
 }
@@ -36,14 +37,14 @@ func NewBreakableReader(r io.Reader, bufSize int) *BreakableReaderImpl {
 	br := BreakableReaderImpl{
 		ctx:    ctx,
 		cancel: cancel,
-		reqCh:  make(chan *readBufReq),
+		reqCh:  make(chan *brReadBufReq),
 		reqMu:  sync.Mutex{},
 		brkCh:  make(chan struct{}),
 		brkMu:  sync.Mutex{},
 	}
 	nextCh := make(chan struct{}, 1)
-	bufCh := make(chan []byte, 1)
-	errCh := make(chan error, 1)
+	bufCh := make(chan []byte, 0)
+	errCh := make(chan error, 0)
 
 	go func() {
 		<-ctx.Done()
@@ -90,26 +91,20 @@ func NewBreakableReader(r io.Reader, bufSize int) *BreakableReaderImpl {
 			req := <-br.reqCh
 			n := len(req.buf)
 
-			var resp readBufResp
-			if n < len(unreadBuf) {
+			var resp brReadBufResp
+			if n <= len(unreadBuf) {
 				resp.buf = unreadBuf[:n]
-				unreadBuf = append([]byte{}, unreadBuf[:n]...)
-			} else if n == len(unreadBuf) {
-				resp.buf = unreadBuf
-				unreadBuf = []byte{}
+				unreadBuf = append([]byte{}, unreadBuf[n:]...)
 			} else {
 				select {
 				case <-brkCh:
-				case <-ctx.Done():
 				default:
 					select {
 					case <-brkCh:
-					case <-ctx.Done():
 					case resp.buf = <-bufCh:
 					default:
 						select {
 						case <-brkCh:
-						case <-ctx.Done():
 						case resp.buf = <-bufCh:
 						case resp.err = <-errCh:
 						}
@@ -123,18 +118,13 @@ func NewBreakableReader(r io.Reader, bufSize int) *BreakableReaderImpl {
 			flushed := false
 			select {
 			case <-brkCh:
-			case <-ctx.Done():
 			default:
-				select {
-				case <-brkCh:
-				case <-ctx.Done():
-				case req.respCh <- &resp:
-					flushed = true
-				}
+				req.respCh <- &resp
+				flushed = true
 			}
 			if !flushed {
 				unreadBuf = append(unreadBuf, resp.buf...)
-				resp.err = fmt.Errorf("read broken")
+				resp.err = fmt.Errorf("broken")
 				req.respCh <- &resp
 			}
 
@@ -152,8 +142,8 @@ func NewBreakableReader(r io.Reader, bufSize int) *BreakableReaderImpl {
 func (r *BreakableReaderImpl) Read(p []byte) (n int, err error) {
 	r.reqMu.Lock()
 	defer r.reqMu.Unlock()
-	respCh := make(chan *readBufResp, 1)
-	r.reqCh <- &readBufReq{
+	respCh := make(chan *brReadBufResp, 1)
+	r.reqCh <- &brReadBufReq{
 		buf:    p,
 		respCh: respCh,
 	}
@@ -168,10 +158,14 @@ func (r *BreakableReaderImpl) BreakRead() {
 	r.brkMu.Lock()
 	defer r.brkMu.Unlock()
 	select {
-	case <-r.ctx.Done():
+	case <-r.brkCh:
 		return
 	default:
 		close(r.brkCh)
 		r.brkCh = make(chan struct{})
 	}
+}
+
+func (r *BreakableReaderImpl) Cancel() {
+	r.cancel()
 }

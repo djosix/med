@@ -14,7 +14,7 @@ func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) 
 	}
 	defer listener.Close()
 
-	gateCh := make(chan struct{}, 9)
+	gateCh := make(chan struct{}, maxConn)
 	connCh := make(chan net.Conn, 0)
 
 	go func() {

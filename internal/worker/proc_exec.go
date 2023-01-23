@@ -31,18 +31,21 @@ type ExecProcCtrl struct {
 ///////////////////////////////////////////////////////////////////////////
 
 type ClientExecProc struct {
-	stdin  *os.File
-	stdout *os.File
-	stderr *os.File
-	tty    bool
+	stdinReader helper.BreakableReader
+	stdin       *os.File
+	stdout      *os.File
+	stderr      *os.File
+	tty         bool
 }
 
 func NewClientExecProc() *ClientExecProc {
+	stdinReader, stdin := helper.GetBreakableStdin()
 	return &ClientExecProc{
-		stdin:  os.Stdin,
-		stdout: os.Stdout,
-		stderr: os.Stderr,
-		tty:    true,
+		stdinReader: stdinReader,
+		stdin:       stdin,
+		stdout:      os.Stdout,
+		stderr:      os.Stderr,
+		tty:         true,
 	}
 }
 
@@ -148,7 +151,7 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 		defer logger.Log("done stdin read loop")
 		buf := make([]byte, 1024)
 		for {
-			n, err := helper.GetBreakableStdin().Read(buf)
+			n, err := p.stdinReader.Read(buf)
 			if err != nil || n == 0 {
 				logger.Log("stdin:", err)
 				return
@@ -170,7 +173,7 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 	go func() {
 		defer wg.Done()
 		<-localCtx.Done()
-		helper.GetBreakableStdin().BreakRead()
+		p.stdinReader.BreakRead()
 	}()
 
 	wg.Wait()

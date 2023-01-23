@@ -4,8 +4,6 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"context"
-
 	"github.com/djosix/med/internal/logger"
 	"github.com/spf13/cobra"
 )
@@ -24,56 +22,9 @@ func init() {
 	clientCmd.AddCommand(testCmd)
 }
 
-type MyReader struct {
-	Ctx    context.Context
-	Cancel context.CancelFunc
-	idx    int
-}
-
-func NewMyReader() *MyReader {
-	r := MyReader{}
-	return &r
-}
-
-func (r *MyReader) Read(p []byte) (int, error) {
-	<-r.Ctx.Done()
-	for i := range p {
-		p[i] = byte(r.idx % 256)
-		r.idx++
-	}
-	return len(p), nil
-}
-
 func mainForTest(cmd *cobra.Command, args []string) error {
 	_, _ = cmd, args
-	// ctx := context.Background()
 
-	// r := NewMyReader()
-	// r.Ctx, r.Cancel = context.WithCancel(ctx)
-
-	// brCtx, brCancel := context.WithCancel(context.Background())
-	// br := helper.NewBreakableReader(brCtx, r, 4)
-	// _ = brCancel
-
-	// go func() {
-	// 	logger.Log("wait")
-	// 	time.Sleep(1 * time.Second)
-	// 	logger.Log("br.BreakRead()")
-	// 	br.BreakRead()
-	// 	logger.Log("wait")
-	// 	time.Sleep(1 * time.Second)
-	// 	logger.Log("br.BreakRead()")
-	// 	br.BreakRead()
-	// }()
-
-	// buf := make([]byte, 32)
-
-	// testRead := func() {
-	// 	if n, err := br.Read(buf); true {
-	// 		logger.Log(fmt.Sprintf("br.Read => n=%v, err=%v", buf[:n], err))
-	// 	}
-	// }
-	// testRead()
 	// r.Cancel()
 	// r.Ctx, r.Cancel = context.WithCancel(ctx)
 	// testRead()
