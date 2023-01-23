@@ -267,8 +267,8 @@ func (loop *LoopImpl) loopDispatch() {
 					TargetID: inPkt.SourceID,
 					SourceID: inPkt.TargetID,
 					Message: &pb.MedMsg{
-						Type:    pb.MedMsgType_MedMsgTypeError,
-						Content: []byte(err.Error()),
+						Type: pb.MedMsgType_MedMsgTypeError,
+						Data: []byte(err.Error()),
 					},
 				}
 			}

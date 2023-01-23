@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/djosix/med/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -22,31 +21,40 @@ var keygenCmd = &cobra.Command{
 			if err != nil {
 				panic(err)
 			}
-			fmt.Printf("private: %s\n", hex.EncodeToString(privateKey))
-			fmt.Printf("public: %s\n", hex.EncodeToString(publicKey))
+			fmt.Printf("key = %s\n", hex.EncodeToString(privateKey))
+			fmt.Printf("pub = %s\n", hex.EncodeToString(publicKey))
 
 			return
 		}
 
 		for i, path := range args {
-			publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+			pub, key, err := ed25519.GenerateKey(rand.Reader)
 			if err != nil {
 				panic(err)
 			}
 
-			privateKeyPath := fmt.Sprintf("%s.key", path)
-			fmt.Printf("privateKey[%d] = %s\n", i, privateKeyPath)
-			if err := os.WriteFile(privateKeyPath, []byte(hex.EncodeToString(privateKey)+"\n"), 0600); err != nil {
-				logger.Print("error:", err)
+			{
+				keyPath := fmt.Sprintf("%s.key", path)
+				data := hex.EncodeToString(key) + "\n"
+				err := os.WriteFile(keyPath, []byte(data), 0600)
+				if err != nil {
+					fmt.Println("error:", err)
+					return
+				}
+				fmt.Printf("key[%d] = %s\n", i, keyPath)
 			}
 
-			publicKeyPath := fmt.Sprintf("%s.pub", path)
-			fmt.Printf("publicKey[%d] = %s\n", i, publicKeyPath)
-			if err := os.WriteFile(publicKeyPath, []byte(hex.EncodeToString(publicKey)+"\n"), 0622); err != nil {
-				logger.Print("error:", err)
+			{
+				pubPath := fmt.Sprintf("%s.pub", path)
+				data := hex.EncodeToString(pub) + "\n"
+				err := os.WriteFile(pubPath, []byte(data), 0622)
+				if err != nil {
+					fmt.Printf("pub[%d] = %s\n", i, pubPath)
+					return
+				}
+				fmt.Printf("pub[%d] = %s\n", i, pubPath)
 			}
 		}
-
 	},
 }
 

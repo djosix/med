@@ -107,8 +107,8 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 					continue
 				}
 				ctx.MsgOutCh <- &pb.MedMsg{
-					Type:    pb.MedMsgType_MedMsgTypeControl,
-					Content: data,
+					Type: pb.MedMsgType_MedMsgTypeControl,
+					Data: data,
 				}
 			}
 		}()
@@ -133,13 +133,13 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 
 			switch msg.Type {
 			case pb.MedMsgType_MedMsgTypeControl:
-				if bytes.Equal(msg.Content, []byte("end")) {
+				if bytes.Equal(msg.Data, []byte("end")) {
 					return
 				} else {
-					panic(fmt.Sprintln("unknown MedMsgType_MedMsgTypeControl:", msg.Content))
+					panic(fmt.Sprintln("unknown MedMsgType_MedMsgTypeControl:", msg.Data))
 				}
 			case pb.MedMsgType_MedMsgTypeData:
-				p.stdout.Write(msg.Content)
+				p.stdout.Write(msg.Data)
 			}
 		}
 	}()
@@ -157,8 +157,8 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 				return
 			}
 			msg := &pb.MedMsg{
-				Type:    pb.MedMsgType_MedMsgTypeData,
-				Content: append([]byte{}, buf[:n]...),
+				Type: pb.MedMsgType_MedMsgTypeData,
+				Data: append([]byte{}, buf[:n]...),
 			}
 			select {
 			case ctx.MsgOutCh <- msg:
@@ -279,14 +279,14 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 			switch msg.Type {
 			case pb.MedMsgType_MedMsgTypeData:
 				select {
-				case ptmxIn <- msg.Content:
+				case ptmxIn <- msg.Data:
 				case <-localCtx.Done():
 					return
 				}
 			case pb.MedMsgType_MedMsgTypeControl:
 				logger.Print("MedMsgType_MedMsgTypeControl")
 				ctrl := ExecProcCtrl{}
-				if err := helper.Decode(msg.Content, &ctrl); err != nil {
+				if err := helper.Decode(msg.Data, &ctrl); err != nil {
 					logger.Print("error:", err)
 					continue
 				}
@@ -322,8 +322,8 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 			}
 
 			msg := &pb.MedMsg{
-				Type:    pb.MedMsgType_MedMsgTypeData,
-				Content: buf,
+				Type: pb.MedMsgType_MedMsgTypeData,
+				Data: buf,
 			}
 
 			select {
@@ -339,8 +339,8 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 	logger.Print("done wg.Wait()")
 
 	ctx.MsgOutCh <- &pb.MedMsg{
-		Type:    pb.MedMsgType_MedMsgTypeControl,
-		Content: []byte("end"),
+		Type: pb.MedMsgType_MedMsgTypeControl,
+		Data: []byte("end"),
 	}
 
 	ctx.Cancel()
