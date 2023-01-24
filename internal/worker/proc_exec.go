@@ -98,15 +98,15 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 		sigCh := make(chan os.Signal, 1)
 		sigCh <- syscall.SIGWINCH
 		signal.Notify(sigCh, syscall.SIGWINCH)
-		defer func() { signal.Stop(sigCh); close(sigCh) }() // Cleanup signals when done.
+		defer func() { signal.Stop(sigCh); close(sigCh) }()
 
 		wg.Add(1)
 		go func() {
-			logger := logger.NewLogger("loop[SIGWINCH]")
-			logger.Debug("start")
-
 			defer wg.Done()
 			defer ctx.Cancel()
+
+			logger := logger.NewLogger("loop[SIGWINCH]")
+			logger.Debug("start")
 			defer logger.Debug("done")
 
 			for {
@@ -134,11 +134,11 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 	// Handle IO
 	wg.Add(1)
 	go func() {
-		logger := logger.NewLogger("loop[ctx.PktInCh]")
-		logger.Debug("start")
-
 		defer wg.Done()
 		defer cancel1()
+
+		logger := logger.NewLogger("loop[ctx.PktInCh]")
+		logger.Debug("start")
 		defer logger.Debug("done")
 
 		for {

@@ -7,7 +7,9 @@ import (
 )
 
 func Decode(buf []byte, out any) error {
-	return gob.NewDecoder(bytes.NewReader(buf)).Decode(out)
+	r := bytes.NewReader(buf)
+	d := gob.NewDecoder(r)
+	return d.Decode(out)
 }
 
 func Encode(in any) ([]byte, error) {
