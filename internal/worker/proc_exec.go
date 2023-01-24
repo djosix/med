@@ -38,10 +38,11 @@ type ProcExecSpec struct {
 ///////////////////////////////////////////////////////////////////////////
 
 type ClientExecProc struct {
-	stdinReader helper.BreakableReader
+	ProcInfo
 	stdin       *os.File
 	stdout      *os.File
 	stderr      *os.File
+	stdinReader helper.BreakableReader
 	argv        []string
 	tty         bool
 }
@@ -50,20 +51,20 @@ func NewClientExecProc(argv []string, tty bool) *ClientExecProc {
 	stdinReader, stdin := helper.GetBreakableStdin()
 
 	return &ClientExecProc{
-		stdin:  stdin,
-		stdout: os.Stdout,
-		stderr: os.Stderr,
-
+		ProcInfo:    NewProcInfo(ProcKind_Exec, ProcSide_Client),
+		stdin:       stdin,
+		stdout:      os.Stdout,
+		stderr:      os.Stderr,
 		stdinReader: stdinReader,
-
-		argv: argv,
-		tty:  tty,
+		argv:        argv,
+		tty:         tty,
 	}
 }
 
 func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 	logger := log.NewLogger("ClientExecProc")
 
+	// Send spec to server
 	ctx.PktOutCh <- &pb.Packet{
 		TargetID: ctx.ProcID,
 		Kind:     pb.PacketKind_PacketKindInfo,
@@ -219,10 +220,14 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 
 ///////////////////////////////////////////////////////////////////////////
 
-type ServerExecProc struct{}
+type ServerExecProc struct {
+	ProcInfo
+}
 
 func NewServerExecProc() *ServerExecProc {
-	return &ServerExecProc{}
+	return &ServerExecProc{
+		ProcInfo: NewProcInfo(ProcKind_Exec, ProcSide_Server),
+	}
 }
 
 func (p *ServerExecProc) Run(ctx ProcRunCtx) {
@@ -231,24 +236,23 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 	defer logger.Debug("done")
 
 	// Get spec from client
-	var spec ProcExecSpec
-	select {
-	case pkt := <-ctx.PktInCh:
-		if pkt.Kind != pb.PacketKind_PacketKindInfo {
-			logger.Error("the first packet.kind is not info")
+	var spec *ProcExecSpec
+	{
+		select {
+		case pkt := <-ctx.PktInCh:
+			if pkt.Kind != pb.PacketKind_PacketKindInfo {
+				logger.Error("the first packet.kind is not info")
+				return
+			}
+			execSpec, err := helper.DecodeAs[ProcExecSpec](pkt.Data)
+			if err != nil || spec == nil || len(spec.ARGV) == 0 {
+				logger.Errorf("decode spec [%v]: %v", spec, err)
+				return
+			}
+			spec = execSpec
+		case <-ctx.Done():
 			return
 		}
-		if err := helper.Decode(pkt.Data, &spec); err != nil {
-			logger.Error("decode spec:", err)
-			return
-		}
-		if len(spec.ARGV) == 0 {
-			logger.Error("invalid argv:", spec.ARGV)
-			return
-		}
-		logger.Debug("spec:", spec)
-	case <-ctx.Done():
-		return
 	}
 
 	ctx1, cancel1 := context.WithCancel(ctx)
@@ -304,7 +308,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 				select {
 				case buf = <-ch:
 					if buf == nil {
-						return // ch closed
+						return // channel is closed
 					}
 				case <-ctx1.Done():
 					return
@@ -313,7 +317,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 				logger.Debug("send", fd, buf)
 				pkt := &pb.Packet{
 					Kind: pb.PacketKind_PacketKindData,
-					Data: append(buf, fd),
+					Data: append(buf, fd), // the last byte represents the output fd
 				}
 
 				select {
@@ -369,7 +373,10 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := cmd.Wait(); err != nil {
+
+		err := cmd.Wait()
+
+		if err != nil {
 			logger.Error("cmd.Wait():", err)
 		}
 		cancel1()
@@ -384,7 +391,9 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 		defer logger.Debug("done")
 
 		<-ctx1.Done()
-		if err := cmd.Process.Kill(); err != nil {
+
+		err := cmd.Process.Kill() // wait in other goroutine
+		if err != nil {
 			logger.Error("cmd.Process.Kill():", err)
 		}
 	}()

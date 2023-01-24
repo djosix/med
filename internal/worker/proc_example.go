@@ -7,12 +7,14 @@ import (
 )
 
 type ExampleProc struct {
+	ProcInfo
 	message string
 }
 
 func NewExampleProc(message string) *ExampleProc {
 	return &ExampleProc{
-		message: message,
+		ProcInfo: NewProcInfo(ProcKind_Example, ProcSide_Both),
+		message:  message,
 	}
 }
 

@@ -22,12 +22,13 @@ var (
 )
 
 type Loop interface {
-	Run()                     // Run the loop
-	Start(h Proc) uint32      // Start a MedProc
-	Remove(id uint32) bool    // Remove a MedProc
-	Done() <-chan struct{}    // Get the done chan of ctx
-	Context() context.Context // Get the ctx of loop
-	Stop()                    // Stop it
+	Run()                                                 // Run the loop
+	Start(h Proc) uint32                                  // Start a Proc
+	StartLater(p Proc) (procID uint32, handle func(bool)) // Start a Proc later
+	Remove(id uint32) bool                                // Remove a Proc
+	Done() <-chan struct{}                                // Get the done chan of ctx
+	Context() context.Context                             // Get the ctx of loop
+	Stop()                                                // Stop the loop
 }
 
 type LoopImpl struct {
@@ -114,13 +115,23 @@ func (loop *LoopImpl) Run() {
 }
 
 func (loop *LoopImpl) Start(p Proc) (procID uint32) {
+	procID, handle := loop.StartLater(p)
+	handle(true)
+	return procID
+}
+
+func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool)) {
 	loop.procLock.Lock()
 	defer loop.procLock.Unlock()
 
-	// get a valid procID
+	// Get a valid procID
 	{
 		procID = loop.lastProcID + 1
-		for _, exists := loop.procData[procID]; exists || procID == 0; {
+		for {
+			_, exists := loop.procData[procID]
+			if !exists && procID != 0 { // procID 0 is reserved
+				break
+			}
 			procID++
 		}
 		loop.lastProcID = procID
@@ -130,12 +141,17 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 	pktInCh := make(chan *pb.Packet)
 	pktOutCh := make(chan *pb.Packet, 1)
 
-	loop.wg.Add(1)
-	go func() {
+	loop.procData[procID] = loopProcInfo{
+		proc:    p,
+		ctx:     ctx,
+		cancel:  cancel,
+		pktInCh: pktInCh,
+	}
+
+	sender := func() {
 		logger := loopLogger.NewLogger(fmt.Sprintf("pktOutCh[%v]", procID))
 		logger.Debug("start")
 
-		defer loop.wg.Done()
 		defer logger.Debug("done")
 
 		for {
@@ -149,6 +165,7 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 				return
 			}
 
+			// Must be the same.
 			pkt.SourceID = procID
 			pkt.TargetID = procID
 
@@ -158,23 +175,19 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 				return
 			}
 		}
-	}()
-
-	loop.procData[procID] = loopProcInfo{
-		proc:    p,
-		ctx:     ctx,
-		cancel:  cancel,
-		pktInCh: pktInCh,
 	}
 
-	loop.wg.Add(1)
-	go func() {
+	start := func() {
 		logger := loopLogger.NewLogger(fmt.Sprintf("proc[%v]", procID))
 		logger.Debug("start")
-
-		defer loop.wg.Done()
 		defer logger.Debug("done")
 		defer loop.Remove(procID)
+
+		loop.wg.Add(1)
+		go func() {
+			defer loop.wg.Done()
+			sender()
+		}()
 
 		runCtx := ProcRunCtx{
 			Context:  ctx,
@@ -185,9 +198,17 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 			ProcID:   procID,
 		}
 		p.Run(runCtx)
-	}()
+	}
 
-	return
+	handle = func(ok bool) {
+		if ok {
+			start()
+		} else {
+			loop.Remove(procID)
+		}
+	}
+
+	return procID, handle
 }
 
 func (loop *LoopImpl) Remove(procID uint32) bool {
@@ -201,7 +222,7 @@ func (loop *LoopImpl) Remove(procID uint32) bool {
 		p.cancel()
 	}
 
-	// shutdown loop if no proc exists
+	// Shutdown loop if no proc exists
 	if len(loop.procData) == 0 {
 		loop.Stop()
 	}
