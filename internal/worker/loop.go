@@ -154,10 +154,13 @@ func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool)) {
 		defer logger.Debug("done")
 
 		for {
+			logger.Debug("0")
 			pkt := <-pktOutCh
+			logger.Debug("1")
 			if pkt == nil {
 				return // closed
 			}
+			logger.Debug("2")
 
 			// logger.Debugf("packet: [%v]", pkt)
 
@@ -165,7 +168,11 @@ func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool)) {
 			pkt.SourceID = procID
 			pkt.TargetID = procID
 
-			loop.pktOutCh <- pkt
+			select {
+			case loop.pktOutCh <- pkt:
+			case <-loop.ctx.Done():
+				return
+			}
 		}
 	}
 
@@ -174,6 +181,7 @@ func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool)) {
 		logger.Debug("start")
 		defer logger.Debug("done")
 		defer loop.Remove(procID)
+		defer close(pktOutCh)
 
 		loop.wg.Add(1)
 		go func() {
@@ -237,6 +245,9 @@ func (loop *LoopImpl) Done() <-chan struct{} {
 
 func (loop *LoopImpl) Stop() {
 	loop.stopOnce.Do(func() {
+		loop.procLock.Lock()
+		defer loop.procLock.Unlock()
+
 		logger := loopLogger.NewLogger("Cancel")
 		logger.Debug("cancel()")
 		loop.cancel()

@@ -1,7 +1,9 @@
 package worker
 
 import (
+	"bufio"
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/djosix/med/internal/helper"
@@ -48,8 +50,8 @@ func NewMainProcClient() *MainProcClient {
 
 func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 	logger := logger.NewLogger("MainProcClient")
-	logger.Info("start")
-	defer logger.Info("done")
+	logger.Debug("start")
+	defer logger.Debug("done")
 
 	var seqNo uint32 = 0
 
@@ -83,10 +85,10 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 	}
 	_ = startProc
 
-	startProc(ProcKind_Exec, ExecSpec{
-		ARGV: []string{"bash"},
-		TTY:  true,
-	})
+	// startProc(ProcKind_Exec, ExecSpec{
+	// 	ARGV: []string{"bash"},
+	// 	TTY:  true,
+	// })
 	// startProc(ProcKind_Example, ExampleSpec{
 	// 	Name: "djosix",
 	// })
@@ -141,15 +143,36 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 		}
 	}
 
-	for {
+	wg := sync.WaitGroup{}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		br, _ := helper.GetBreakableStdin()
+		defer br.BreakRead()
+		defer br.Cancel()
+
+		line, _, err := bufio.NewReader(br).ReadLine()
+		if err != nil {
+			return
+		}
+
+		startProc(ProcKind_Exec, ExecSpec{
+			ARGV: []string{"bash", "-c", string(line)},
+			TTY:  true,
+		})
+	}()
+
+	for done := false; !done; {
 		var pkt *pb.Packet
 		select {
 		case pkt = <-ctx.PktInCh:
 			if pkt == nil {
-				break
+				return
 			}
 		case <-ctx.Done():
-			break
+			return
 		}
 
 		logger.Debugf("receive: [%v]", pkt)
