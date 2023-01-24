@@ -226,7 +226,7 @@ func (p *ServerMainProc) Run(ctx ProcRunCtx) {
 		startProcID, startHandle := ctx.Loop.StartLater(proc)
 
 		if startProcID != data.ProcID {
-			startHandle(true)
+			startHandle(false)
 			return fmt.Errorf("invalid new procID: required=%v got=%v", data.ProcID, startProcID)
 		}
 

@@ -27,15 +27,15 @@ type ProcRunCtx struct {
 type ProcKind string
 
 const (
-	ProcKind_None     ProcKind = "none"
-	ProcKind_Example  ProcKind = "example"
-	ProcKind_Main     ProcKind = "main"
-	ProcKind_Exec     ProcKind = "exec"
-	ProcKind_Term     ProcKind = "term"
-	ProcKind_LocalPF  ProcKind = "localpf"
-	ProcKind_RemotePF ProcKind = "remotepf"
-	ProcKind_Upload   ProcKind = "upload"
-	ProcKind_Download ProcKind = "download"
+	ProcKind_None     ProcKind = "None"
+	ProcKind_Example  ProcKind = "Example"
+	ProcKind_Main     ProcKind = "Main"
+	ProcKind_Exec     ProcKind = "Exec"
+	ProcKind_Term     ProcKind = "Term"
+	ProcKind_LocalPF  ProcKind = "LocalPF"
+	ProcKind_RemotePF ProcKind = "RemotePF"
+	ProcKind_Upload   ProcKind = "Upload"
+	ProcKind_Download ProcKind = "Download"
 )
 
 type ProcSide byte
