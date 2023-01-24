@@ -83,10 +83,13 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 	}
 	_ = startProc
 
-	startProc(ProcKind_Exec, ExecProcSpec{
+	startProc(ProcKind_Exec, ExecSpec{
 		ARGV: []string{"bash"},
 		TTY:  true,
 	})
+	// startProc(ProcKind_Example, ExampleSpec{
+	// 	Name: "djosix",
+	// })
 
 	removeProc := func(procID uint32) {
 		seqNo := atomic.AddUint32(&seqNo, 1)

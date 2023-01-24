@@ -35,7 +35,7 @@ func CreateProcClient(kind ProcKind, spec any) Proc {
 		}
 
 	case ProcKind_Exec:
-		if spec, ok := spec.(ExecProcSpec); ok {
+		if spec, ok := spec.(ExecSpec); ok {
 			proc = NewExecProcClient(spec)
 		}
 

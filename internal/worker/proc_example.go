@@ -3,8 +3,8 @@ package worker
 import (
 	"fmt"
 
+	"github.com/djosix/med/internal/helper"
 	"github.com/djosix/med/internal/logger"
-	pb "github.com/djosix/med/internal/protobuf"
 )
 
 type ExampleSpec struct {
@@ -28,12 +28,7 @@ func NewExampleProcClient(spec ExampleSpec) *ExampleProcClient {
 func (p *ExampleProcClient) Run(ctx *ProcRunCtx) {
 	// Send spec
 	SendProcSpec(ctx, p.spec)
-
-	ctx.PktOutCh <- &pb.Packet{
-		Kind: pb.PacketKind_PacketKindData,
-		Data: []byte(fmt.Sprintf("Hello %s from client", p.spec.Name)),
-	}
-
+	ctx.PktOutCh <- helper.NewDataPkt([]byte(fmt.Sprintf("Hello %s from client", p.spec.Name)))
 	logger.Info(string((<-ctx.PktInCh).Data))
 }
 
@@ -60,10 +55,6 @@ func (p *ExampleProcServer) Run(ctx *ProcRunCtx) {
 	}
 	logger.Debug("spec =", spec)
 
-	ctx.PktOutCh <- &pb.Packet{
-		Kind: pb.PacketKind_PacketKindData,
-		Data: []byte(fmt.Sprintf("Hello %s from server", spec.Name)),
-	}
-
+	ctx.PktOutCh <- helper.NewDataPkt([]byte(fmt.Sprintf("Hello %s from server", spec.Name)))
 	logger.Info(string((<-ctx.PktInCh).Data))
 }

@@ -10,7 +10,7 @@ import (
 func SendProcSpec(ctx *ProcRunCtx, spec any) {
 	ctx.PktOutCh <- &pb.Packet{
 		Kind: pb.PacketKind_PacketKindInfo,
-		Data: helper.MustEncode(&spec),
+		Data: helper.MustEncode(spec),
 	}
 }
 

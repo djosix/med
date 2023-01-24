@@ -24,12 +24,12 @@ const (
 	ExecInfoKind_WinSize ExecInfoKind = 1
 )
 
-type ExecProcInfo struct {
+type ExecInfo struct {
 	Kind ExecInfoKind
 	Data []byte
 }
 
-type ExecProcSpec struct {
+type ExecSpec struct {
 	ARGV []string
 	TTY  bool
 }
@@ -46,7 +46,7 @@ type ExecProcClient struct {
 	tty         bool
 }
 
-func NewExecProcClient(spec ExecProcSpec) *ExecProcClient {
+func NewExecProcClient(spec ExecSpec) *ExecProcClient {
 	stdinReader, stdin := helper.GetBreakableStdin()
 
 	return &ExecProcClient{
@@ -66,7 +66,7 @@ func (p *ExecProcClient) Run(ctx *ProcRunCtx) {
 	// Send spec to server
 	ctx.PktOutCh <- &pb.Packet{
 		Kind: pb.PacketKind_PacketKindInfo,
-		Data: helper.MustEncode(&ExecProcSpec{ARGV: p.argv, TTY: p.tty}),
+		Data: helper.MustEncode(&ExecSpec{ARGV: p.argv, TTY: p.tty}),
 	}
 
 	if p.tty {
@@ -121,7 +121,7 @@ func (p *ExecProcClient) Run(ctx *ProcRunCtx) {
 				}
 				ctx.PktOutCh <- &pb.Packet{
 					Kind: pb.PacketKind_PacketKindInfo,
-					Data: helper.MustEncode(&ExecProcInfo{
+					Data: helper.MustEncode(&ExecInfo{
 						Kind: ExecInfoKind_WinSize,
 						Data: helper.MustEncode(winSize),
 					}),
@@ -231,7 +231,7 @@ func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
 	defer logger.Debug("done")
 
 	// Get spec from client
-	var spec *ExecProcSpec
+	var spec *ExecSpec
 	{
 		var pkt *pb.Packet
 		select {
@@ -248,7 +248,7 @@ func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
 			return
 		}
 
-		s, err := helper.DecodeAs[ExecProcSpec](pkt.Data)
+		s, err := helper.DecodeAs[ExecSpec](pkt.Data)
 		if err != nil || len(s.ARGV) == 0 {
 			logger.Errorf("decode spec: err=[%v] spec=[%v]", err, spec)
 			return
@@ -416,7 +416,7 @@ func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
 					return
 				}
 			case pb.PacketKind_PacketKindInfo:
-				info := ExecProcInfo{}
+				info := ExecInfo{}
 				if err := helper.Decode(pkt.Data, &info); err != nil {
 					logger.Error("decode to info:", err)
 					continue
