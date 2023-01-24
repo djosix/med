@@ -94,7 +94,7 @@ func NewBreakableReader(r io.Reader, bufSize int) *BreakableReaderImpl {
 			var resp brReadBufResp
 			if n <= len(unreadBuf) {
 				resp.buf = unreadBuf[:n]
-				unreadBuf = append([]byte{}, unreadBuf[n:]...)
+				unreadBuf = Clone(unreadBuf[n:])
 			} else {
 				select {
 				case <-brkCh:
