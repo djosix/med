@@ -9,47 +9,45 @@ import (
 	pb "github.com/djosix/med/internal/protobuf"
 )
 
-////////////////////////////////////////////////////////////////////////////////////////////////
-
-type ProcMainMsgKind string
+type MainProcMsgKind string
 
 const (
-	ProcMainMsgKind_Start  ProcMainMsgKind = "Start"
-	ProcMainMsgKind_Remove ProcMainMsgKind = "Remove"
-	ProcMainMsgKind_Exit   ProcMainMsgKind = "Exit"
+	MainProcMsgKind_Start  MainProcMsgKind = "Start"
+	MainProcMsgKind_Remove MainProcMsgKind = "Remove"
+	MainProcMsgKind_Exit   MainProcMsgKind = "Exit"
 )
 
-type ProcMainMsg struct {
-	Kind  ProcMainMsgKind
+type MainProcMsg struct {
+	Kind  MainProcMsgKind
 	SeqNo uint32
 	Data  []byte
 }
 
-type ProcMainMsg_Start struct {
+type MainProcMsg_Start struct {
 	ProcID   uint32
 	ProcKind ProcKind
 	Error    string // response
 }
 
-type ProcMainMsg_Remove struct {
+type MainProcMsg_Remove struct {
 	ProcID uint32
 	Error  string // response
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////
+// Client
 
-type ClientMainProc struct {
+type MainProcClient struct {
 	ProcInfo
 }
 
-func NewClientMainProc() *ClientMainProc {
-	return &ClientMainProc{
+func NewMainProcClient() *MainProcClient {
+	return &MainProcClient{
 		ProcInfo: NewProcInfo(ProcKind_Main, ProcSide_Client),
 	}
 }
 
-func (p *ClientMainProc) Run(ctx ProcRunCtx) {
-	logger := logger.NewLogger("ClientMainProc")
+func (p *MainProcClient) Run(ctx *ProcRunCtx) {
+	logger := logger.NewLogger("MainProcClient")
 	logger.Info("start")
 	defer logger.Info("done")
 
@@ -62,7 +60,7 @@ func (p *ClientMainProc) Run(ctx ProcRunCtx) {
 	startProcBySeqNo := map[uint32]procStartInfo{}
 
 	startProc := func(procKind ProcKind, spec any) {
-		proc := CreateClientProc(procKind, spec)
+		proc := CreateProcClient(procKind, spec)
 		if proc == nil {
 			return
 		}
@@ -72,10 +70,10 @@ func (p *ClientMainProc) Run(ctx ProcRunCtx) {
 		seqNo := atomic.AddUint32(&seqNo, 1)
 		ctx.PktOutCh <- &pb.Packet{
 			Kind: pb.PacketKind_PacketKindData,
-			Data: helper.MustEncode(&ProcMainMsg{
-				Kind:  ProcMainMsgKind_Start,
+			Data: helper.MustEncode(&MainProcMsg{
+				Kind:  MainProcMsgKind_Start,
 				SeqNo: seqNo,
-				Data: helper.MustEncode(&ProcMainMsg_Start{
+				Data: helper.MustEncode(&MainProcMsg_Start{
 					ProcKind: procKind,
 					ProcID:   procID,
 				}),
@@ -85,7 +83,7 @@ func (p *ClientMainProc) Run(ctx ProcRunCtx) {
 	}
 	_ = startProc
 
-	startProc(ProcKind_Exec, ProcExecSpec{
+	startProc(ProcKind_Exec, ExecProcSpec{
 		ARGV: []string{"bash"},
 		TTY:  true,
 	})
@@ -94,19 +92,19 @@ func (p *ClientMainProc) Run(ctx ProcRunCtx) {
 		seqNo := atomic.AddUint32(&seqNo, 1)
 		ctx.PktOutCh <- &pb.Packet{
 			Kind: pb.PacketKind_PacketKindData,
-			Data: helper.MustEncode(&ProcMainMsg{
-				Kind:  ProcMainMsgKind_Remove,
+			Data: helper.MustEncode(&MainProcMsg{
+				Kind:  MainProcMsgKind_Remove,
 				SeqNo: seqNo,
-				Data:  helper.MustEncode(&ProcMainMsg_Remove{ProcID: procID}),
+				Data:  helper.MustEncode(&MainProcMsg_Remove{ProcID: procID}),
 			}),
 		}
 	}
 	_ = removeProc
 
-	handleMessage := func(msg *ProcMainMsg) {
+	handleMessage := func(msg *MainProcMsg) {
 		switch msg.Kind {
-		case ProcMainMsgKind_Start:
-			data, err := helper.DecodeAs[ProcMainMsg_Start](msg.Data)
+		case MainProcMsgKind_Start:
+			data, err := helper.DecodeAs[MainProcMsg_Start](msg.Data)
 			if err != nil {
 				logger.Error("decode start error:", err)
 				return
@@ -127,8 +125,8 @@ func (p *ClientMainProc) Run(ctx ProcRunCtx) {
 				p.handle(true)
 			}
 
-		case ProcMainMsgKind_Remove:
-			data, err := helper.DecodeAs[ProcMainMsg_Remove](msg.Data)
+		case MainProcMsgKind_Remove:
+			data, err := helper.DecodeAs[MainProcMsg_Remove](msg.Data)
 			if err != nil {
 				logger.Error("decode remove:", err)
 				return
@@ -155,7 +153,7 @@ func (p *ClientMainProc) Run(ctx ProcRunCtx) {
 
 		switch pkt.Kind {
 		case pb.PacketKind_PacketKindData:
-			msg, err := helper.DecodeAs[ProcMainMsg](pkt.Data)
+			msg, err := helper.DecodeAs[MainProcMsg](pkt.Data)
 			if err != nil {
 				logger.Error("decode as msg:", err)
 				continue
@@ -167,33 +165,26 @@ func (p *ClientMainProc) Run(ctx ProcRunCtx) {
 	}
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////
+// Server
 
-type ServerMainProc struct {
+type MainProcServer struct {
 	ProcInfo
 }
 
-func NewServerMainProc() *ServerMainProc {
-	return &ServerMainProc{
+func NewMainProcServer() *MainProcServer {
+	return &MainProcServer{
 		ProcInfo: NewProcInfo(ProcKind_Main, ProcSide_Server),
 	}
 }
 
-func (p *ServerMainProc) Run(ctx ProcRunCtx) {
+func (p *MainProcServer) Run(ctx *ProcRunCtx) {
 	logger := logger.NewLogger("ServerMainProc")
 	logger.Debug("start")
 	defer logger.Debug("done")
 
-	handleStart := func(data *ProcMainMsg_Start) error {
+	handleStart := func(data *MainProcMsg_Start) error {
 		// Create proc by kind
-		var proc Proc
-		switch data.ProcKind {
-		case ProcKind_Exec:
-			proc = NewServerExecProc()
-		default:
-			logger.Error("unknown proc kind:", data.ProcKind)
-		}
-
+		proc := CreateProcServer(data.ProcKind)
 		if proc == nil {
 			// Send error
 			ctx.PktOutCh <- &pb.Packet{
@@ -216,7 +207,7 @@ func (p *ServerMainProc) Run(ctx ProcRunCtx) {
 		return nil
 	}
 
-	handleRemove := func(data *ProcMainMsg_Remove) error {
+	handleRemove := func(data *MainProcMsg_Remove) error {
 		if ok := ctx.Loop.Remove(data.ProcID); !ok {
 			logger.Errorf("proc[%v] not removed", data.ProcID)
 			return fmt.Errorf("not removed")
@@ -225,19 +216,19 @@ func (p *ServerMainProc) Run(ctx ProcRunCtx) {
 		return nil
 	}
 
-	handleMessage := func(msg *ProcMainMsg) {
+	handleMessage := func(msg *MainProcMsg) {
 		var dataToReturn []byte
 
 		switch msg.Kind {
-		case ProcMainMsgKind_Exit:
+		case MainProcMsgKind_Exit:
 			ctx.Cancel()
 			ctx.Loop.Stop()
 			logger.Info("EXIT")
 
-		case ProcMainMsgKind_Start:
-			data, err := helper.DecodeAs[ProcMainMsg_Start](msg.Data)
+		case MainProcMsgKind_Start:
+			data, err := helper.DecodeAs[MainProcMsg_Start](msg.Data)
 			if err != nil {
-				logger.Error("decode ProcMainStartSpec:", err)
+				logger.Error("decode MainProcMsg_Start:", err)
 			} else {
 				err = handleStart(&data)
 			}
@@ -246,10 +237,10 @@ func (p *ServerMainProc) Run(ctx ProcRunCtx) {
 			}
 			dataToReturn = helper.MustEncode(data)
 
-		case ProcMainMsgKind_Remove:
-			data, err := helper.DecodeAs[ProcMainMsg_Remove](msg.Data)
+		case MainProcMsgKind_Remove:
+			data, err := helper.DecodeAs[MainProcMsg_Remove](msg.Data)
 			if err != nil {
-				logger.Error("decode ProcMainRemoveSpec:", err)
+				logger.Error("decode MainProcMsg_Remove:", err)
 			} else {
 				err = handleRemove(&data)
 			}
@@ -282,9 +273,9 @@ func (p *ServerMainProc) Run(ctx ProcRunCtx) {
 		// Handle packet
 		switch pkt.Kind {
 		case pb.PacketKind_PacketKindData:
-			msg, err := helper.DecodeAs[ProcMainMsg](pkt.Data)
+			msg, err := helper.DecodeAs[MainProcMsg](pkt.Data)
 			if err != nil {
-				logger.Error("decode msg:", err)
+				logger.Error("decode MainProcMsg:", err)
 				continue
 			}
 			handleMessage(&msg)

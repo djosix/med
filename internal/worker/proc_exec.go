@@ -18,26 +18,25 @@ import (
 	"golang.org/x/term"
 )
 
-///////////////////////////////////////////////////////////////////////////
+type ExecInfoKind byte
 
 const (
-	ProcExecInfoKindWinSize = 1
-	ProcExecCtrl_Exit       = "Exit"
+	ExecInfoKind_WinSize ExecInfoKind = 1
 )
 
-type ProcExecInfo struct {
-	Kind int
+type ExecProcInfo struct {
+	Kind ExecInfoKind
 	Data []byte
 }
 
-type ProcExecSpec struct {
+type ExecProcSpec struct {
 	ARGV []string
 	TTY  bool
 }
 
-///////////////////////////////////////////////////////////////////////////
+// Client
 
-type ClientExecProc struct {
+type ExecProcClient struct {
 	ProcInfo
 	stdin       *os.File
 	stdout      *os.File
@@ -47,10 +46,10 @@ type ClientExecProc struct {
 	tty         bool
 }
 
-func NewClientExecProc(spec ProcExecSpec) *ClientExecProc {
+func NewExecProcClient(spec ExecProcSpec) *ExecProcClient {
 	stdinReader, stdin := helper.GetBreakableStdin()
 
-	return &ClientExecProc{
+	return &ExecProcClient{
 		ProcInfo:    NewProcInfo(ProcKind_Exec, ProcSide_Client),
 		stdin:       stdin,
 		stdout:      os.Stdout,
@@ -61,14 +60,13 @@ func NewClientExecProc(spec ProcExecSpec) *ClientExecProc {
 	}
 }
 
-func (p *ClientExecProc) Run(ctx ProcRunCtx) {
-	logger := log.NewLogger("ClientExecProc")
+func (p *ExecProcClient) Run(ctx *ProcRunCtx) {
+	logger := log.NewLogger("ExecProcClient")
 
 	// Send spec to server
 	ctx.PktOutCh <- &pb.Packet{
-		TargetID: ctx.ProcID,
-		Kind:     pb.PacketKind_PacketKindInfo,
-		Data:     helper.MustEncode(&ProcExecSpec{ARGV: p.argv, TTY: p.tty}),
+		Kind: pb.PacketKind_PacketKindInfo,
+		Data: helper.MustEncode(&ExecProcSpec{ARGV: p.argv, TTY: p.tty}),
 	}
 
 	if p.tty {
@@ -123,8 +121,8 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 				}
 				ctx.PktOutCh <- &pb.Packet{
 					Kind: pb.PacketKind_PacketKindInfo,
-					Data: helper.MustEncode(&ProcExecInfo{
-						Kind: ProcExecInfoKindWinSize,
+					Data: helper.MustEncode(&ExecProcInfo{
+						Kind: ExecInfoKind_WinSize,
 						Data: helper.MustEncode(winSize),
 					}),
 				}
@@ -156,8 +154,8 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 			switch pkt.Kind {
 			case pb.PacketKind_PacketKindCtrl:
 				switch string(pkt.Data) {
-				case ProcExecCtrl_Exit:
-					logger.Debug("ProcExecCtrl_Exit")
+				case pb.PacketDataCtrl_Exit:
+					logger.Debug("PacketDataCtrl_Exit")
 					return
 				default:
 					logger.Warn("unknown pkt.Data for PacketKind_PacketKindCtrl:", pkt.Data)
@@ -215,25 +213,25 @@ func (p *ClientExecProc) Run(ctx ProcRunCtx) {
 	wg.Wait()
 }
 
-///////////////////////////////////////////////////////////////////////////
+// Server
 
-type ServerExecProc struct {
+type ExecProcServer struct {
 	ProcInfo
 }
 
-func NewServerExecProc() *ServerExecProc {
-	return &ServerExecProc{
+func NewExecProcServer() *ExecProcServer {
+	return &ExecProcServer{
 		ProcInfo: NewProcInfo(ProcKind_Exec, ProcSide_Server),
 	}
 }
 
-func (p *ServerExecProc) Run(ctx ProcRunCtx) {
-	logger := logger.NewLogger("ServerExecProc")
+func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
+	logger := logger.NewLogger("ExecProcServer")
 	logger.Debug("start")
 	defer logger.Debug("done")
 
 	// Get spec from client
-	var spec *ProcExecSpec
+	var spec *ExecProcSpec
 	{
 		var pkt *pb.Packet
 		select {
@@ -250,7 +248,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 			return
 		}
 
-		s, err := helper.DecodeAs[ProcExecSpec](pkt.Data)
+		s, err := helper.DecodeAs[ExecProcSpec](pkt.Data)
 		if err != nil || len(s.ARGV) == 0 {
 			logger.Errorf("decode spec: err=[%v] spec=[%v]", err, spec)
 			return
@@ -409,7 +407,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 				return
 			}
 
-			logger.Debug("packet", pkt)
+			// logger.Debugf("packet [%v]", pkt)
 
 			switch pkt.Kind {
 			case pb.PacketKind_PacketKindData:
@@ -418,13 +416,13 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 					return
 				}
 			case pb.PacketKind_PacketKindInfo:
-				info := ProcExecInfo{}
+				info := ExecProcInfo{}
 				if err := helper.Decode(pkt.Data, &info); err != nil {
 					logger.Error("decode to info:", err)
 					continue
 				}
 				switch info.Kind {
-				case ProcExecInfoKindWinSize:
+				case ExecInfoKind_WinSize:
 					if spec.TTY {
 						winSize := pty.Winsize{}
 						if err := helper.Decode(info.Data, &winSize); err != nil {
@@ -447,7 +445,7 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 
 	ctx.PktOutCh <- &pb.Packet{
 		Kind: pb.PacketKind_PacketKindCtrl,
-		Data: []byte(ProcExecCtrl_Exit),
+		Data: []byte(pb.PacketDataCtrl_Exit),
 	}
 
 	ctx.Cancel()

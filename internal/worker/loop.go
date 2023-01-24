@@ -189,7 +189,7 @@ func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool)) {
 			PktOutCh: pktOutCh,
 			ProcID:   procID,
 		}
-		p.Run(runCtx)
+		p.Run(&runCtx)
 	}
 
 	handle = func(ok bool) {

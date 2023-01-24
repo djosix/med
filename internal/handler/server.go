@@ -119,7 +119,7 @@ func ServerHandler(ctx context.Context, rw io.ReadWriter) error {
 	var loop worker.Loop = worker.NewLoop(ctx, rw)
 	// loop.Start(worker.NewExampleProc("message from server"))
 	// loop.Start(worker.NewServerExecProc())
-	loop.Start(worker.NewServerMainProc())
+	loop.Start(worker.NewMainProcServer())
 
 	loop.Run()
 

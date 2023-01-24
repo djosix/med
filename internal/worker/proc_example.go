@@ -3,29 +3,67 @@ package worker
 import (
 	"fmt"
 
+	"github.com/djosix/med/internal/logger"
 	pb "github.com/djosix/med/internal/protobuf"
 )
 
-type ExampleProc struct {
-	ProcInfo
-	message string
+type ExampleSpec struct {
+	Name string
 }
 
-func NewExampleProc(message string) *ExampleProc {
-	return &ExampleProc{
-		ProcInfo: NewProcInfo(ProcKind_Example, ProcSide_Both),
-		message:  message,
+// Client
+
+type ExampleProcClient struct {
+	ProcInfo
+	spec ExampleSpec
+}
+
+func NewExampleProcClient(spec ExampleSpec) *ExampleProcClient {
+	return &ExampleProcClient{
+		ProcInfo: NewProcInfo(ProcKind_Example, ProcSide_Client),
+		spec:     spec,
 	}
 }
 
-func (p *ExampleProc) Run(ctx ProcRunCtx) {
-	fmt.Printf("ExampleProc: sending %#v\n", p.message)
+func (p *ExampleProcClient) Run(ctx *ProcRunCtx) {
+	// Send spec
+	SendProcSpec(ctx, p.spec)
+
 	ctx.PktOutCh <- &pb.Packet{
 		Kind: pb.PacketKind_PacketKindData,
-		Data: []byte(p.message),
+		Data: []byte(fmt.Sprintf("Hello %s from client", p.spec.Name)),
 	}
-	fmt.Printf("ExampleProc: waiting for response\n")
 
-	pkt := <-ctx.PktInCh
-	fmt.Printf("ExampleProc: received %#v\n", string(pkt.Data))
+	logger.Info(string((<-ctx.PktInCh).Data))
+}
+
+// Server
+
+type ExampleProcServer struct {
+	ProcInfo
+}
+
+func NewExampleProcServer() *ExampleProcServer {
+	return &ExampleProcServer{
+		ProcInfo: NewProcInfo(ProcKind_Example, ProcSide_Server),
+	}
+}
+
+func (p *ExampleProcServer) Run(ctx *ProcRunCtx) {
+	logger := logger.NewLogger("ExampleProcServer")
+
+	// Get spec
+	spec, err := RecvProcSpec[ExampleSpec](ctx)
+	if err != nil {
+		logger.Error(err)
+		return
+	}
+	logger.Debug("spec =", spec)
+
+	ctx.PktOutCh <- &pb.Packet{
+		Kind: pb.PacketKind_PacketKindData,
+		Data: []byte(fmt.Sprintf("Hello %s from server", spec.Name)),
+	}
+
+	logger.Info(string((<-ctx.PktInCh).Data))
 }

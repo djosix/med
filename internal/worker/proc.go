@@ -8,7 +8,7 @@ import (
 )
 
 type Proc interface {
-	Run(ctx ProcRunCtx)
+	Run(ctx *ProcRunCtx)
 	Kind() ProcKind
 	Side() ProcSide
 }
@@ -24,60 +24,19 @@ type ProcRunCtx struct {
 
 //
 
-type ProcKind string
-
-const (
-	ProcKind_None     ProcKind = "None"
-	ProcKind_Example  ProcKind = "Example"
-	ProcKind_Main     ProcKind = "Main"
-	ProcKind_Exec     ProcKind = "Exec"
-	ProcKind_Term     ProcKind = "Term"
-	ProcKind_LocalPF  ProcKind = "LocalPF"
-	ProcKind_RemotePF ProcKind = "RemotePF"
-	ProcKind_Upload   ProcKind = "Upload"
-	ProcKind_Download ProcKind = "Download"
-)
-
-type ProcSide byte
-
-const (
-	ProcSide_None   ProcSide = 0b00
-	ProcSide_Client ProcSide = 0b01
-	ProcSide_Server ProcSide = 0b10
-	ProcSide_Both   ProcSide = 0b11
-)
-
-type ProcInfo struct {
-	kind ProcKind
-	side ProcSide
-}
-
-func NewProcInfo(kind ProcKind, side ProcSide) ProcInfo {
-	return ProcInfo{kind: kind, side: side}
-}
-
-func (p ProcInfo) Kind() ProcKind {
-	return p.kind
-}
-
-func (p ProcInfo) Side() ProcSide {
-	return p.side
-}
-
-//
-
-func CreateClientProc(kind ProcKind, spec any) Proc {
-	logger := logger.NewLogger("CreateClientProc")
+func CreateProcClient(kind ProcKind, spec any) Proc {
+	logger := logger.NewLogger("CreateProcClient")
+	var proc Proc
 
 	switch kind {
 	case ProcKind_Example:
-		if spec, ok := spec.(string); ok {
-			return NewExampleProc(spec)
+		if spec, ok := spec.(ExampleSpec); ok {
+			proc = NewExampleProcClient(spec)
 		}
 
 	case ProcKind_Exec:
-		if spec, ok := spec.(ProcExecSpec); ok {
-			return NewClientExecProc(spec)
+		if spec, ok := spec.(ExecProcSpec); ok {
+			proc = NewExecProcClient(spec)
 		}
 
 	default:
@@ -85,6 +44,44 @@ func CreateClientProc(kind ProcKind, spec any) Proc {
 		return nil
 	}
 
-	logger.Error("cannot create proc kind=[%v] by spec=%#v", kind, spec)
-	return nil
+	if proc == nil {
+		logger.Error("cannot create proc kind=[%v] by spec=%#v", kind, spec)
+		return nil
+	}
+
+	if proc.Side()&ProcSide_Client == 0 {
+		logger.Error("the created proc is not for client")
+		return nil
+	}
+
+	return proc
+}
+
+func CreateProcServer(kind ProcKind) Proc {
+	logger := logger.NewLogger("CreateProcServer")
+
+	var proc Proc
+
+	switch kind {
+	case ProcKind_Example:
+		proc = NewExampleProcServer()
+
+	case ProcKind_Exec:
+		proc = NewExecProcServer()
+
+	default:
+		logger.Error("proc kind=[%v] not registered", kind)
+	}
+
+	if proc == nil {
+		logger.Error("cannot create proc kind=[%v]", kind)
+		return nil
+	}
+
+	if proc.Side()&ProcSide_Server == 0 {
+		logger.Error("the created proc is not for server")
+		return nil
+	}
+
+	return proc
 }
