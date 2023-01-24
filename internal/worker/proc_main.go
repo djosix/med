@@ -196,12 +196,9 @@ func (p *ServerMainProc) Run(ctx ProcRunCtx) {
 
 		if proc == nil {
 			// Send error
-			select {
-			case ctx.PktOutCh <- &pb.Packet{
+			ctx.PktOutCh <- &pb.Packet{
 				Kind: pb.PacketKind_PacketKindError,
 				Data: []byte(fmt.Sprintf("proc not created: kind=%v", data.ProcKind)),
-			}:
-			case <-ctx.Done():
 			}
 			return fmt.Errorf("not created")
 		}
@@ -263,14 +260,9 @@ func (p *ServerMainProc) Run(ctx ProcRunCtx) {
 		if dataToReturn != nil {
 			msg := *msg // clone
 			msg.Data = dataToReturn
-			pkt := &pb.Packet{
+			ctx.PktOutCh <- &pb.Packet{
 				Kind: pb.PacketKind_PacketKindData,
 				Data: helper.MustEncode(msg),
-			}
-
-			select {
-			case ctx.PktOutCh <- pkt:
-			case <-ctx.Done():
 			}
 		}
 	}
