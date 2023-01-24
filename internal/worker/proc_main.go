@@ -179,23 +179,6 @@ func NewServerMainProc() *ServerMainProc {
 	}
 }
 
-func HandlePackets(ctx ProcRunCtx, f func(pkt *pb.Packet) (cont bool)) {
-	for {
-		var pkt *pb.Packet
-		select {
-		case pkt = <-ctx.PktInCh:
-			if pkt == nil {
-				return
-			}
-		case <-ctx.Done():
-			return
-		}
-		if !f(pkt) {
-			return
-		}
-	}
-}
-
 func (p *ServerMainProc) Run(ctx ProcRunCtx) {
 	logger := logger.NewLogger("ServerMainProc")
 	logger.Debug("start")
