@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 
+	"github.com/djosix/med/internal/logger"
 	pb "github.com/djosix/med/internal/protobuf"
 )
 
@@ -23,17 +24,18 @@ type ProcRunCtx struct {
 
 //
 
-type ProcKind byte
+type ProcKind string
 
 const (
-	ProcKind_None     ProcKind = 0
-	ProcKind_Example  ProcKind = 1
-	ProcKind_Exec     ProcKind = 11
-	ProcKind_Term     ProcKind = 12
-	ProcKind_LocalPF  ProcKind = 21
-	ProcKind_RemotePF ProcKind = 22
-	ProcKind_Upload   ProcKind = 31
-	ProcKind_Download ProcKind = 32
+	ProcKind_None     ProcKind = "none"
+	ProcKind_Example  ProcKind = "example"
+	ProcKind_Main     ProcKind = "main"
+	ProcKind_Exec     ProcKind = "exec"
+	ProcKind_Term     ProcKind = "term"
+	ProcKind_LocalPF  ProcKind = "localpf"
+	ProcKind_RemotePF ProcKind = "remotepf"
+	ProcKind_Upload   ProcKind = "upload"
+	ProcKind_Download ProcKind = "download"
 )
 
 type ProcSide byte
@@ -60,4 +62,29 @@ func (p ProcInfo) Kind() ProcKind {
 
 func (p ProcInfo) Side() ProcSide {
 	return p.side
+}
+
+//
+
+func CreateClientProc(kind ProcKind, spec any) Proc {
+	logger := logger.NewLogger("CreateClientProc")
+
+	switch kind {
+	case ProcKind_Example:
+		if spec, ok := spec.(string); ok {
+			return NewExampleProc(spec)
+		}
+
+	case ProcKind_Exec:
+		if spec, ok := spec.(ProcExecSpec); ok {
+			return NewClientExecProc(spec)
+		}
+
+	default:
+		logger.Error("proc kind=[%v] not registered", kind)
+		return nil
+	}
+
+	logger.Error("cannot create proc kind=[%v] by spec=%#v", kind, spec)
+	return nil
 }

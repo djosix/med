@@ -201,11 +201,16 @@ func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool)) {
 	}
 
 	handle = func(ok bool) {
-		if ok {
-			start()
-		} else {
+		if !ok {
 			loop.Remove(procID)
+			return
 		}
+
+		loop.wg.Add(1)
+		go func() {
+			defer loop.wg.Done()
+			start()
+		}()
 	}
 
 	return procID, handle
@@ -287,6 +292,7 @@ func (loop *LoopImpl) dispatcher() {
 		loop.procLock.Lock()
 		defer loop.procLock.Unlock()
 
+		// logger.Debugf("packet: %#v", pkt)
 		p, ok := loop.procData[pkt.TargetID]
 		if !ok {
 			return fmt.Errorf("proc[%v] not found", pkt.TargetID)

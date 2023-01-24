@@ -47,7 +47,7 @@ type ClientExecProc struct {
 	tty         bool
 }
 
-func NewClientExecProc(argv []string, tty bool) *ClientExecProc {
+func NewClientExecProc(spec ProcExecSpec) *ClientExecProc {
 	stdinReader, stdin := helper.GetBreakableStdin()
 
 	return &ClientExecProc{
@@ -56,8 +56,8 @@ func NewClientExecProc(argv []string, tty bool) *ClientExecProc {
 		stdout:      os.Stdout,
 		stderr:      os.Stderr,
 		stdinReader: stdinReader,
-		argv:        argv,
-		tty:         tty,
+		argv:        spec.ARGV,
+		tty:         spec.TTY,
 	}
 }
 
@@ -238,21 +238,27 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 	// Get spec from client
 	var spec *ProcExecSpec
 	{
+		var pkt *pb.Packet
 		select {
-		case pkt := <-ctx.PktInCh:
-			if pkt.Kind != pb.PacketKind_PacketKindInfo {
-				logger.Error("the first packet.kind is not info")
+		case pkt = <-ctx.PktInCh:
+			if pkt == nil {
 				return
 			}
-			execSpec, err := helper.DecodeAs[ProcExecSpec](pkt.Data)
-			if err != nil || spec == nil || len(spec.ARGV) == 0 {
-				logger.Errorf("decode spec [%v]: %v", spec, err)
-				return
-			}
-			spec = execSpec
 		case <-ctx.Done():
 			return
 		}
+
+		if pkt.Kind != pb.PacketKind_PacketKindInfo {
+			logger.Error("the first packet.kind is not info")
+			return
+		}
+
+		s, err := helper.DecodeAs[ProcExecSpec](pkt.Data)
+		if err != nil || len(s.ARGV) == 0 {
+			logger.Errorf("decode spec: err=[%v] spec=[%v]", err, spec)
+			return
+		}
+		spec = &s
 	}
 
 	ctx1, cancel1 := context.WithCancel(ctx)
@@ -353,16 +359,16 @@ func (p *ServerExecProc) Run(ctx ProcRunCtx) {
 				return
 			}
 		}
+
 		cmd.Stdin = rPipes[0]
 		cmd.Stdout = wPipes[1]
 		cmd.Stderr = wPipes[2]
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Setsid: true,
-		}
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		if err = cmd.Start(); err != nil {
 			logger.Error("cmd.Start:", err)
 			return
 		}
+
 		inputFile = wPipes[0]
 		wPipes[1].Close()
 		wPipes[2].Close()

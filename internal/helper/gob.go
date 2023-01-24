@@ -12,15 +12,12 @@ func Decode(buf []byte, out any) error {
 	return d.Decode(out)
 }
 
-func DecodeAs[T any](buf []byte) (*T, error) {
-	var out any
-	if err := Decode(buf, out); err != nil {
-		return nil, err
+func DecodeAs[T any](buf []byte) (T, error) {
+	var out T
+	if err := Decode(buf, &out); err != nil {
+		return out, err
 	}
-	if out, ok := out.(T); ok {
-		return &out, nil
-	}
-	return nil, fmt.Errorf("invalid type")
+	return out, nil
 }
 
 func Encode(in any) ([]byte, error) {
