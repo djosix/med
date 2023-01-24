@@ -69,10 +69,10 @@ func NewLoop(ctx context.Context, rw io.ReadWriter) *LoopImpl {
 		procLock:   sync.Mutex{},
 		runLock:    sync.Mutex{},
 
-		pktInCh:         make(chan *pb.Packet),
-		pktOutCh:        make(chan *pb.Packet),
+		pktInCh:         make(chan *pb.Packet, 0),
+		pktOutCh:        make(chan *pb.Packet, 0),
 		frameRw:         frameRw,
-		dispatchTimeout: time.Duration(5) * time.Second,
+		dispatchTimeout: time.Duration(1) * time.Second,
 
 		wg:       sync.WaitGroup{},
 		ctx:      ctx,
@@ -107,7 +107,7 @@ func (loop *LoopImpl) Run() {
 	loop.wg.Wait()
 
 	if conn, ok := loop.ctx.Value("conn").(net.Conn); ok {
-		logger.Debug("RefreshIO(conn)")
+		logger.Debug("RefreshIO")
 		helper.RefreshIO(conn)
 	} else {
 		panic("cannot find conn in ctx")
@@ -139,7 +139,7 @@ func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool)) {
 
 	ctx, cancel := context.WithCancel(loop.ctx)
 	pktInCh := make(chan *pb.Packet)
-	pktOutCh := make(chan *pb.Packet, 1)
+	pktOutCh := make(chan *pb.Packet)
 
 	loop.procData[procID] = loopProcInfo{
 		proc:    p,
@@ -149,31 +149,23 @@ func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool)) {
 	}
 
 	sender := func() {
-		logger := loopLogger.NewLogger(fmt.Sprintf("pktOutCh[%v]", procID))
+		logger := loopLogger.NewLogger(fmt.Sprintf("sender[proc=%v]", procID))
 		logger.Debug("start")
-
 		defer logger.Debug("done")
 
 		for {
-			var pkt *pb.Packet
-			select {
-			case pkt = <-pktOutCh:
-				if pkt == nil {
-					return // pktOutCh is closed
-				}
-			case <-ctx.Done():
-				return
+			pkt := <-pktOutCh
+			if pkt == nil {
+				return // closed
 			}
+
+			// logger.Debugf("packet: [%v]", pkt)
 
 			// Must be the same.
 			pkt.SourceID = procID
 			pkt.TargetID = procID
 
-			select {
-			case loop.pktOutCh <- pkt:
-			case <-ctx.Done():
-				return
-			}
+			loop.pktOutCh <- pkt
 		}
 	}
 
@@ -250,7 +242,7 @@ func (loop *LoopImpl) Stop() {
 		loop.cancel()
 
 		if conn, ok := loop.ctx.Value("conn").(net.Conn); ok {
-			logger.Debug("BreakIO(conn)")
+			logger.Debug("BreakIO")
 			helper.BreakIO(conn)
 		} else {
 			panic("cannot find conn in ctx")
@@ -292,19 +284,17 @@ func (loop *LoopImpl) dispatcher() {
 		loop.procLock.Lock()
 		defer loop.procLock.Unlock()
 
-		// logger.Debugf("packet: %#v", pkt)
+		// logger.Debugf("packet: [%v]", pkt)
 		p, ok := loop.procData[pkt.TargetID]
 		if !ok {
 			return fmt.Errorf("proc[%v] not found", pkt.TargetID)
 		}
 
-		timeout := time.NewTimer(loop.dispatchTimeout)
-
 		select {
 		case p.pktInCh <- pkt:
 		case <-loop.Done():
 			return fmt.Errorf("loop closed")
-		case <-timeout.C:
+		case <-time.NewTimer(loop.dispatchTimeout).C:
 			return fmt.Errorf("dispatch timeout")
 		}
 		return nil
@@ -314,10 +304,10 @@ func (loop *LoopImpl) dispatcher() {
 		select {
 		case pkt := <-loop.pktInCh:
 			if pkt == nil {
-				logger.Error("loop.inPktCh: nil")
 				return
 			}
 			if err := dispatchToProc(pkt); err != nil {
+				logger.Debugf("dispatch error for packet [%v]: %v", pkt, err)
 				loop.pktOutCh <- &pb.Packet{
 					TargetID: pkt.SourceID,
 					SourceID: pkt.TargetID,

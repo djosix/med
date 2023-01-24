@@ -14,9 +14,9 @@ import (
 type ProcMainMsgKind string
 
 const (
-	ProcMainMsgKind_Start  ProcMainMsgKind = "start"
-	ProcMainMsgKind_Remove ProcMainMsgKind = "remove"
-	ProcMainMsgKind_Exit   ProcMainMsgKind = "exit"
+	ProcMainMsgKind_Start  ProcMainMsgKind = "Start"
+	ProcMainMsgKind_Remove ProcMainMsgKind = "Remove"
+	ProcMainMsgKind_Exit   ProcMainMsgKind = "Exit"
 )
 
 type ProcMainMsg struct {
@@ -86,8 +86,8 @@ func (p *ClientMainProc) Run(ctx ProcRunCtx) {
 	_ = startProc
 
 	startProc(ProcKind_Exec, ProcExecSpec{
-		ARGV: []string{"bash", "-i"},
-		TTY:  false,
+		ARGV: []string{"bash"},
+		TTY:  true,
 	})
 
 	removeProc := func(procID uint32) {
@@ -144,14 +144,14 @@ func (p *ClientMainProc) Run(ctx ProcRunCtx) {
 		var pkt *pb.Packet
 		select {
 		case pkt = <-ctx.PktInCh:
+			if pkt == nil {
+				break
+			}
 		case <-ctx.Done():
 			break
 		}
-		if pkt == nil {
-			break
-		}
 
-		logger.Debug("packet:", pkt)
+		logger.Debugf("receive: [%v]", pkt)
 
 		switch pkt.Kind {
 		case pb.PacketKind_PacketKindData:
@@ -230,7 +230,7 @@ func (p *ServerMainProc) Run(ctx ProcRunCtx) {
 			return fmt.Errorf("invalid new procID: required=%v got=%v", data.ProcID, startProcID)
 		}
 
-		logger.Debug("start proc[%v] kind=%v", startProcID, data.ProcKind)
+		logger.Debugf("start proc[%v] kind=%v", startProcID, data.ProcKind)
 		startHandle(true)
 
 		return nil
