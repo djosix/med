@@ -154,13 +154,11 @@ func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool)) {
 		defer logger.Debug("done")
 
 		for {
-			logger.Debug("0")
 			pkt := <-pktOutCh
-			logger.Debug("1")
 			if pkt == nil {
+				logger.Debug("output packet is nil")
 				return // closed
 			}
-			logger.Debug("2")
 
 			// logger.Debugf("packet: [%v]", pkt)
 
@@ -178,10 +176,10 @@ func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool)) {
 
 	start := func() {
 		logger := loopLogger.NewLogger(fmt.Sprintf("proc[%v]", procID))
-		logger.Debug("start")
+		logger.Debugf("start kind=%v", p.Kind())
 		defer logger.Debug("done")
 		defer loop.Remove(procID)
-		defer close(pktOutCh)
+		defer close(pktOutCh) // must close after proc ends
 
 		loop.wg.Add(1)
 		go func() {
@@ -202,6 +200,7 @@ func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool)) {
 
 	handle = func(ok bool) {
 		if !ok {
+			logger.Debugf("cancel handle for proc[%v]", procID)
 			loop.Remove(procID)
 			return
 		}
@@ -220,16 +219,21 @@ func (loop *LoopImpl) Remove(procID uint32) bool {
 	loop.procLock.Lock()
 	defer loop.procLock.Unlock()
 
+	loopLogger.Debugf("remove proc[%v]", procID)
+
 	p, ok := loop.procData[procID]
 	if ok {
-		delete(loop.procData, procID)
+		loopLogger.Debugf("cleanup proc[%v]", procID)
+
 		close(p.pktInCh)
 		p.cancel()
+		delete(loop.procData, procID)
 	}
 
 	// Shutdown loop if no proc exists
 	if len(loop.procData) == 0 {
-		loop.Stop()
+		loopLogger.Debugf("shutdown loop")
+		go loop.Stop() // avoid deadlock
 	}
 
 	return ok
@@ -278,7 +282,8 @@ func (loop *LoopImpl) reader() {
 			continue
 		}
 		if pkt.Kind == pb.PacketKind_PacketKindError {
-			logger.Error("got error pkt:", pkt.String())
+			logger.Errorf("found error [%v]", pkt.String())
+			loop.Remove(pkt.TargetID)
 			continue
 		}
 		loop.pktInCh <- &pkt

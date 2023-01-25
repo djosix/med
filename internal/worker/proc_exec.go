@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -38,38 +39,36 @@ type ExecSpec struct {
 
 type ExecProcClient struct {
 	ProcInfo
-	stdin       *os.File
-	stdout      *os.File
-	stderr      *os.File
-	stdinReader helper.BreakableReader
-	argv        []string
-	tty         bool
+	ExecSpec
+	stdin      *os.File
+	stdout     *os.File
+	stderr     *os.File
+	reader     io.Reader
+	cancelRead func()
 }
 
 func NewExecProcClient(spec ExecSpec) *ExecProcClient {
-	stdinReader, stdin := helper.GetBreakableStdin()
+	reader, cancelRead, stdin := helper.GetCancelStdin()
 
 	return &ExecProcClient{
-		ProcInfo:    NewProcInfo(ProcKind_Exec, ProcSide_Client),
-		stdin:       stdin,
-		stdout:      os.Stdout,
-		stderr:      os.Stderr,
-		stdinReader: stdinReader,
-		argv:        spec.ARGV,
-		tty:         spec.TTY,
+		ProcInfo:   NewProcInfo(ProcKind_Exec, ProcSide_Client),
+		ExecSpec:   spec,
+		stdin:      stdin,
+		stdout:     os.Stdout,
+		stderr:     os.Stderr,
+		reader:     reader,
+		cancelRead: cancelRead,
 	}
 }
 
 func (p *ExecProcClient) Run(ctx *ProcRunCtx) {
 	logger := log.NewLogger("ExecProcClient")
+	logger.Debug("start")
+	defer logger.Debug("done")
 
-	// Send spec to server
-	ctx.PktOutCh <- &pb.Packet{
-		Kind: pb.PacketKind_PacketKindInfo,
-		Data: helper.MustEncode(&ExecSpec{ARGV: p.argv, TTY: p.tty}),
-	}
+	SendProcSpec(ctx, p.ExecSpec)
 
-	if p.tty {
+	if p.TTY {
 		oldState, err := term.MakeRaw(int(p.stdin.Fd()))
 		if err != nil {
 			panic(err)
@@ -91,7 +90,7 @@ func (p *ExecProcClient) Run(ctx *ProcRunCtx) {
 	ctx1, cancel1 := context.WithCancel(ctx)
 	wg := sync.WaitGroup{}
 
-	if p.tty {
+	if p.TTY {
 		// Handle SIGWINCH
 
 		sigCh := make(chan os.Signal, 1)
@@ -187,7 +186,7 @@ func (p *ExecProcClient) Run(ctx *ProcRunCtx) {
 
 		buf := make([]byte, 1024)
 		for {
-			n, err := p.stdinReader.Read(buf)
+			n, err := p.reader.Read(buf)
 			if err != nil || n == 0 {
 				logger.Debugf("stdin: n=[%v] err=[%v]", n, err)
 				return
@@ -207,7 +206,7 @@ func (p *ExecProcClient) Run(ctx *ProcRunCtx) {
 		defer logger.Debug("BreakRead")
 
 		<-ctx1.Done()
-		p.stdinReader.BreakRead()
+		p.cancelRead()
 	}()
 
 	wg.Wait()
@@ -231,32 +230,12 @@ func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
 	defer logger.Debug("done")
 
 	// Get spec from client
-	var spec *ExecSpec
-	{
-		var pkt *pb.Packet
-		select {
-		case pkt = <-ctx.PktInCh:
-			if pkt == nil {
-				return
-			}
-		case <-ctx.Done():
-			return
-		}
-
-		if pkt.Kind != pb.PacketKind_PacketKindInfo {
-			logger.Error("the first packet.kind is not info")
-			return
-		}
-
-		s, err := helper.DecodeAs[ExecSpec](pkt.Data)
-		if err != nil || len(s.ARGV) == 0 {
-			logger.Errorf("decode spec: err=[%v] spec=[%v]", err, spec)
-			return
-		}
-
-		logger.Debug("spec =", s)
-		spec = &s
+	spec, err := RecvProcSpec[ExecSpec](ctx)
+	if err != nil {
+		logger.Error("spec:", err)
+		return
 	}
+	logger.Debug("spec:", spec)
 
 	ctx1, cancel1 := context.WithCancel(ctx)
 	defer cancel1()

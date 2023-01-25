@@ -116,19 +116,16 @@ func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
 	defer logger.Debug("done")
 
 	var loop worker.Loop = worker.NewLoop(ctx, rw)
-	// loop.Start(worker.NewExampleProc("message from client"))
-	// loop.Start(worker.NewClientExecProc([]string{"bash", "-i"}, true))
-	loop.Start(worker.NewMainProcClient())
-	loop.Run()
+	{
 
-	// {
-	// 	buf := []byte("client loop closed")
-	// 	if _, err := rw.Write(buf); err == nil {
-	// 		if n, err := rw.Read(buf); err == nil {
-	// 			logger.Show("remote:", string(buf[:n]))
-	// 		}
-	// 	}
-	// }
+		// loop.Start(worker.NewExampleProc("message from client"))
+		loop.Start(worker.NewExecProcClient(worker.ExecSpec{
+			ARGV: []string{"bash"},
+			TTY:  true,
+		}))
+		// loop.Start(worker.NewMainProcClient())
+	}
+	loop.Run()
 
 	return nil
 }

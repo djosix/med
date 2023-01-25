@@ -149,14 +149,14 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 	go func() {
 		defer wg.Done()
 
-		br, _ := helper.GetBreakableStdin()
-		defer br.BreakRead()
-		defer br.Cancel()
+		reader, cancel, _ := helper.GetCancelStdin()
+		defer cancel()
 
-		line, _, err := bufio.NewReader(br).ReadLine()
+		line, _, err := bufio.NewReader(reader).ReadLine()
 		if err != nil {
 			return
 		}
+		logger.Debug("line:", line)
 
 		startProc(ProcKind_Exec, ExecSpec{
 			ARGV: []string{"bash", "-c", string(line)},
