@@ -13,10 +13,10 @@ declare TAGS=""
 
 shift
 if [[ $# == 0 ]]; then
-    TAGS="client server dev keygen"
+    TAGS="client server keygen"
 else
     for tag in "$@"; do
-        TAGS="$TAGS,$tag"
+        TAGS="$TAGS $tag"
     done
     TAGS="${TAGS#,}"
     echo "tags = $TAGS"
@@ -26,7 +26,7 @@ case "$TARGET" in
     debug)
         rm -f "$BIN"
         protoc -I="$PROTO_DIR" --go_out=. "$PROTO_DIR/med.proto"
-        go build -tags="$TAGS" -o "$BIN" ./main.go
+        go build -tags="$TAGS dev" -o "$BIN" ./main.go
         ;;
     release)
         rm -f "$BIN"

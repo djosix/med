@@ -375,6 +375,7 @@ func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
 		logger.Debug("start")
 		defer logger.Debug("done")
 
+	forLoop:
 		for {
 			var pkt *pb.Packet
 			select {
@@ -398,7 +399,7 @@ func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
 				info := ExecInfo{}
 				if err := helper.Decode(pkt.Data, &info); err != nil {
 					logger.Error("decode to info:", err)
-					continue
+					continue forLoop
 				}
 				switch info.Kind {
 				case ExecInfoKind_WinSize:
@@ -406,7 +407,7 @@ func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
 						winSize := pty.Winsize{}
 						if err := helper.Decode(info.Data, &winSize); err != nil {
 							logger.Error("decode to winSize:", err)
-							continue
+							continue forLoop
 						}
 						logger.Debug("set winsize:", winSize)
 						if err := pty.Setsize(inputFile, &winSize); err != nil {

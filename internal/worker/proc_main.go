@@ -164,31 +164,38 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 		})
 	}()
 
-	for done := false; !done; {
-		var pkt *pb.Packet
-		select {
-		case pkt = <-ctx.PktInCh:
-			if pkt == nil {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+	forLoop:
+		for {
+			var pkt *pb.Packet
+			select {
+			case pkt = <-ctx.PktInCh:
+				if pkt == nil {
+					return
+				}
+			case <-ctx.Done():
 				return
 			}
-		case <-ctx.Done():
-			return
-		}
 
-		logger.Debugf("receive: [%v]", pkt)
+			logger.Debugf("receive: [%v]", pkt)
 
-		switch pkt.Kind {
-		case pb.PacketKind_PacketKindData:
-			msg, err := helper.DecodeAs[MainProcMsg](pkt.Data)
-			if err != nil {
-				logger.Error("decode as msg:", err)
-				continue
+			switch pkt.Kind {
+			case pb.PacketKind_PacketKindData:
+				msg, err := helper.DecodeAs[MainProcMsg](pkt.Data)
+				if err != nil {
+					logger.Error("decode as msg:", err)
+					continue forLoop
+				}
+				handleMessage(&msg)
+			default:
+				logger.Error("invalid packet kind:", pkt.Kind)
 			}
-			handleMessage(&msg)
-		default:
-			logger.Error("invalid packet kind:", pkt.Kind)
 		}
-	}
+	}()
+
+	wg.Wait()
 }
 
 // Server
@@ -284,6 +291,7 @@ func (p *MainProcServer) Run(ctx *ProcRunCtx) {
 		}
 	}
 
+forLoop:
 	for {
 		// Get new packet
 		var pkt *pb.Packet
@@ -302,7 +310,7 @@ func (p *MainProcServer) Run(ctx *ProcRunCtx) {
 			msg, err := helper.DecodeAs[MainProcMsg](pkt.Data)
 			if err != nil {
 				logger.Error("decode MainProcMsg:", err)
-				continue
+				continue forLoop
 			}
 			handleMessage(&msg)
 		}
