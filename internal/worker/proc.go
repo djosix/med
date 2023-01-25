@@ -50,7 +50,7 @@ func CreateProcClient(kind ProcKind, spec any) (Proc, error) {
 		return nil, fmt.Errorf("proc is not for client")
 	}
 
-	return proc
+	return proc, nil
 }
 
 func CreateProcServer(kind ProcKind) (Proc, error) {
