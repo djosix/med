@@ -11,6 +11,7 @@ import (
 var clientCmd = &cobra.Command{
 	Use:     "med",
 	Run:     handler.ClientMain,
+	Args:    cobra.ArbitraryArgs,
 	PreRunE: handler.CheckClientFlags,
 }
 

@@ -323,11 +323,17 @@ func (loop *LoopImpl) dispatcher() {
 			}
 			if err := dispatchToProc(pkt); err != nil {
 				logger.Debugf("dispatch error for packet [%v]: %v", pkt, err)
-				loop.pktOutCh <- &pb.Packet{
+				pkt := &pb.Packet{
 					TargetID: pkt.SourceID,
 					SourceID: pkt.TargetID,
 					Kind:     pb.PacketKind_PacketKindError,
 					Data:     []byte(err.Error()),
+				}
+
+				select {
+				case loop.pktOutCh <- pkt:
+				case <-loop.ctx.Done():
+					return
 				}
 			}
 		case <-loop.ctx.Done():

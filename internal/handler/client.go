@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/djosix/med/internal"
 	"github.com/djosix/med/internal/helper"
@@ -11,22 +12,23 @@ import (
 	"github.com/djosix/med/internal/logger"
 	"github.com/djosix/med/internal/readwriter"
 	"github.com/djosix/med/internal/worker"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
-const (
-	ClientFlagExec  = "exec"
-	ClientFlagShell = "shell"
-	ClientFlagMenu  = "menu"
-)
+// const (
+// 	ClientFlagExec  = "exec"
+// 	ClientFlagShell = "shell"
+// 	ClientFlagMenu  = "menu"
+// )
 
 func InitClientFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.SortFlags = false
 
-	flags.StringP(ClientFlagExec, "x", "", "execute command")
-	flags.StringP(ClientFlagShell, "z", "", "shell to execute command")
-	flags.BoolP(ClientFlagMenu, "m", false, "display menu")
+	// flags.StringP(ClientFlagExec, "x", "", "execute command")
+	// flags.StringP(ClientFlagShell, "z", "", "shell to execute command")
+	// flags.BoolP(ClientFlagMenu, "m", false, "display menu")
 
 	InitCommonFlags(cmd)
 }
@@ -37,15 +39,13 @@ func CheckClientFlags(cmd *cobra.Command, args []string) error {
 
 type ClientOpts struct {
 	CommonOpts
-	Exec     string
-	Shell    string
-	ShowMenu bool
+	SubArgs []string
 }
 
 func GetClientOpts(cmd *cobra.Command, args []string) (*ClientOpts, error) {
-	flags := cmd.Flags()
+	// flags := cmd.Flags()
 
-	var err error
+	// var err error
 	opts := ClientOpts{}
 
 	if cOpts, err := GetCommonOpts(cmd, args); err != nil {
@@ -54,17 +54,19 @@ func GetClientOpts(cmd *cobra.Command, args []string) (*ClientOpts, error) {
 		opts.CommonOpts = *cOpts
 	}
 
-	if opts.Exec, err = flags.GetString(ClientFlagExec); err != nil {
-		return nil, err
-	}
+	opts.SubArgs = args
 
-	if opts.Shell, err = flags.GetString(ClientFlagShell); err != nil {
-		return nil, err
-	}
+	// if opts.Exec, err = flags.GetString(ClientFlagExec); err != nil {
+	// 	return nil, err
+	// }
 
-	if opts.ShowMenu, err = flags.GetBool(ClientFlagMenu); err != nil {
-		return nil, err
-	}
+	// if opts.Shell, err = flags.GetString(ClientFlagShell); err != nil {
+	// 	return nil, err
+	// }
+
+	// if opts.ShowMenu, err = flags.GetBool(ClientFlagMenu); err != nil {
+	// 	return nil, err
+	// }
 
 	return &opts, nil
 }
@@ -103,6 +105,8 @@ func ClientStart(ctx context.Context, opts *ClientOpts) error {
 		handler = BindInitializers(handler, inits...)
 	}
 
+	ctx = context.WithValue(ctx, "opts", opts)
+
 	switch opts.Mode {
 	case CommonFlagConnect:
 		return Connect(ctx, opts.Endpoint, handler)
@@ -118,12 +122,29 @@ func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
 	logger.Debug("start")
 	defer logger.Debug("done")
 
+	opts, ok := ctx.Value("opts").(*ClientOpts)
+	if !ok {
+		panic("cannot get opts from ctx")
+	}
+
+	// if len(opts.SubArgs) == 0 {
+
+	// }
+	argv := []string{"bash"}
+	if len(opts.SubArgs) != 0 {
+		argv = opts.SubArgs
+	}
+	fmt.Println("args:", opts.SubArgs)
+	// return nil
+
 	// rootProc := worker.NewExampleProc("message from client")
 	// rootProc := worker.NewMainProcClient()
 	rootProc := worker.NewExecProcClient(worker.ExecSpec{
-		ARGV: []string{"bash"},
-		TTY:  true,
+		ARGV: argv,
+		TTY:  isatty.IsTerminal(os.Stdin.Fd()),
 	})
+
+	// Send root proc kind to server
 	{
 		frameRw := readwriter.NewPlainFrameReadWriter(rw)
 		frame := helper.MustEncode(rootProc.Kind())
