@@ -344,7 +344,7 @@ func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
 		err := cmd.Wait()
 
 		if err != nil {
-			logger.Error("cmd.Wait:", err)
+			logger.Warn("cmd.Wait:", err)
 		}
 		cancel1()
 	}()
@@ -361,7 +361,7 @@ func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
 
 		err := cmd.Process.Kill() // wait in other goroutine
 		if err != nil {
-			logger.Error("cmd.Process.Kill:", err)
+			logger.Warn("kill:", err)
 		}
 	}()
 

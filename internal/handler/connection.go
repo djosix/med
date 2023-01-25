@@ -9,7 +9,7 @@ import (
 
 func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) error {
 	logger := logger.NewLogger("Listen")
-	logger.Info("Bind on", endpoint)
+	logger.Info("bind on", endpoint)
 
 	listener, err := net.Listen("tcp", endpoint)
 	if err != nil {
@@ -27,8 +27,9 @@ func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) 
 		for {
 			<-gateCh
 			conn, err := listener.Accept()
+			logger.Info("accept", conn.RemoteAddr())
 			if err != nil {
-				logger.Error("Accept:", err)
+				logger.Error("accept:", err)
 				continue
 			}
 			connCh <- conn
@@ -59,7 +60,7 @@ func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) 
 
 func Connect(ctx context.Context, endpoint string, handler Handler) error {
 	logger := logger.NewLogger("Connect")
-	logger.Info(endpoint)
+	logger.Info("target", endpoint)
 
 	conn, err := net.Dial("tcp", endpoint)
 	if err != nil {
@@ -67,7 +68,7 @@ func Connect(ctx context.Context, endpoint string, handler Handler) error {
 	}
 	defer conn.Close()
 
-	logger.Info("Connected to", conn.RemoteAddr())
+	logger.Info("connected to", conn.RemoteAddr())
 
 	ctx = context.WithValue(ctx, "conn", conn)
 	err = handler(ctx, conn)
