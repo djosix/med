@@ -63,6 +63,9 @@ func CreateProcServer(kind ProcKind) (Proc, error) {
 	case ProcKind_Exec:
 		proc = NewExecProcServer()
 
+	case ProcKind_Main:
+		proc = NewMainProcServer()
+
 	default:
 		return nil, fmt.Errorf("proc kind=[%v] not registered", kind)
 	}

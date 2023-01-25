@@ -134,11 +134,11 @@ func ServerHandler(ctx context.Context, rw io.ReadWriter) error {
 
 	var rootProc worker.Proc
 	{
-		p, err := worker.CreateProcServer(rootProcKind)
+		proc, err := worker.CreateProcServer(rootProcKind)
 		if err != nil {
 			return err
 		}
-		rootProc = p
+		rootProc = proc
 	}
 
 	loop := worker.NewLoop(ctx, rw)
