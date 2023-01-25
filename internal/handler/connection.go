@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"net"
+	"strings"
 
 	"github.com/djosix/med/internal/logger"
 )
@@ -11,7 +12,7 @@ func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) 
 	logger := logger.NewLogger("Listen")
 	logger.Info("bind on", endpoint)
 
-	listener, err := net.Listen("tcp", endpoint)
+	listener, err := net.Listen(splitEndpoint(endpoint))
 	if err != nil {
 		return err
 	}
@@ -62,7 +63,7 @@ func Connect(ctx context.Context, endpoint string, handler Handler) error {
 	logger := logger.NewLogger("Connect")
 	logger.Info("target", endpoint)
 
-	conn, err := net.Dial("tcp", endpoint)
+	conn, err := net.Dial(splitEndpoint(endpoint))
 	if err != nil {
 		return err
 	}
@@ -77,4 +78,12 @@ func Connect(ctx context.Context, endpoint string, handler Handler) error {
 	}
 
 	return nil
+}
+
+func splitEndpoint(endpoint string) (string, string) {
+	if strings.HasPrefix(endpoint, "unix:") {
+		parts := strings.SplitN(endpoint, ":", 2)
+		return parts[0], parts[1]
+	}
+	return "tcp", endpoint
 }

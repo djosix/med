@@ -275,12 +275,10 @@ func GetCommonOpts(cmd *cobra.Command, args []string) (*CommonOpts, error) {
 		opts.UseRaw = useRaw
 	}
 
-	{
-		verbose, err := flags.GetInt(CommonFlagVerbose)
-		if err != nil {
-			panic(CommonFlagVerbose)
-		}
-		logger.SetLevel(logger.LogLevel(verbose))
+	if verbosity, err := flags.GetInt(CommonFlagVerbose); err != nil {
+		panic(CommonFlagVerbose)
+	} else {
+		logger.SetLevel(logger.LogLevel(verbosity))
 	}
 
 	return &opts, nil

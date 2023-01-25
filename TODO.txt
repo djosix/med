@@ -1,0 +1,60 @@
+- send and handle exit packet in each proc
+
+- design menu root proc
+
+----- menu idea
+    med -c ENDPOINT exec -- bash -c 'test'
+    med -c ENDPOINT -f ./script.med
+    med -c ENDPOINT -e 'info; exec /bin/bash'
+    med -c ENDPOINT prompt
+        usage:
+            exec bash -c "test"
+            port tcp local 127.0.0.1:9999 :9999
+            port tcp local www.google.com:443 :9999
+            port remote :1234 :1234
+            proxy :8080
+            proxy ./proxy.sock
+            socks local :9999
+            socks local ./socks.sock
+            socks remote :9999
+            socks remote ./socks.sock
+            copy local:/etc/passwd remote:/etc/passwd
+            copy remote:/etc/passwd local:.
+            copy remote:/etc/passwd remote:/etc/passwd.bak
+            info    # show server information
+            list    # list current procs
+            stop    # stop proc
+            help    # show this help
+            log 5
+            print 123
+        med> exec bash -c "echo 123"
+        123
+        med> port local 127.0.0.1:22 :22222
+        forwarding remote 0.0.0.0:22222 to local 127.0.0.1:22
+        med> list
+        [0] port local 127.0.0.1:22 :22222
+        med> stop 0
+        stopped [0] port local 127.0.0.1:22 :22222
+        med> list
+        med> 
+
+
+host1:
+    med server -l :9999
+
+host2:
+    python3 -m http.server 8888
+    med -c host1:9999 socks remote ./temp.sock
+
+host3:
+    med -c host1:9999 forward remote ./temp.sock :9050
+    curl --socks5 localhost:9050 http://localhost:8888
+    med forward remote asdasd:12111 local 0.0.0.0:11111
+
+host1:
+    med server -l :9999 -r
+host2:
+    med server -l :9999 -r host1:9999
+    med -c host1:9999 forward local :9999 ./host2.med.sock
+host3:
+    med -c host1:9999 

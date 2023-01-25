@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	ClientFlagNoTTY = "notty"
-	ClientFlagShell = "shell"
-	ClientFlagMenu  = "menu"
+	ClientFlagNoTTY   = "notty"
+	ClientFlagHistory = "shell"
+	ClientFlagMenu    = "menu"
 )
 
 func InitClientFlags(cmd *cobra.Command) {

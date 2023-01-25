@@ -1,5 +1,5 @@
 syntax = "proto3";
-package proto;
+package med;
 option go_package = "./internal/protobuf";
 
 
@@ -24,8 +24,9 @@ message Packet {
 }
 
 enum PacketKind {
-    PacketKindInfo = 0;
-    PacketKindCtrl = 1;
-    PacketKindData = 2;
-    PacketKindError = 3;
+    PacketKindNone = 0;
+    PacketKindInfo = 1;
+    PacketKindCtrl = 2;
+    PacketKindData = 3;
+    PacketKindError = 4;
 }

@@ -1,5 +1,5 @@
 package protobuf
 
 const (
-	PacketDataCtrl_Exit = "Exit"
+	PacketDataCtrl_Exit = "EXIT"
 )
