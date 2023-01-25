@@ -2,8 +2,8 @@ package worker
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/djosix/med/internal/logger"
 	pb "github.com/djosix/med/internal/protobuf"
 )
 
@@ -24,8 +24,7 @@ type ProcRunCtx struct {
 
 //
 
-func CreateProcClient(kind ProcKind, spec any) Proc {
-	logger := logger.NewLogger("CreateProcClient")
+func CreateProcClient(kind ProcKind, spec any) (Proc, error) {
 	var proc Proc
 
 	switch kind {
@@ -40,26 +39,21 @@ func CreateProcClient(kind ProcKind, spec any) Proc {
 		}
 
 	default:
-		logger.Error("proc kind=[%v] not registered", kind)
-		return nil
+		return nil, fmt.Errorf("proc kind=[%v] not registered", kind)
 	}
 
 	if proc == nil {
-		logger.Error("cannot create proc kind=[%v] by spec=%#v", kind, spec)
-		return nil
+		return nil, fmt.Errorf("proc kind=[%v] is nil", kind)
 	}
 
 	if proc.Side()&ProcSide_Client == 0 {
-		logger.Error("the created proc is not for client")
-		return nil
+		return nil, fmt.Errorf("proc is not for client")
 	}
 
 	return proc
 }
 
-func CreateProcServer(kind ProcKind) Proc {
-	logger := logger.NewLogger("CreateProcServer")
-
+func CreateProcServer(kind ProcKind) (Proc, error) {
 	var proc Proc
 
 	switch kind {
@@ -70,18 +64,16 @@ func CreateProcServer(kind ProcKind) Proc {
 		proc = NewExecProcServer()
 
 	default:
-		logger.Error("proc kind=[%v] not registered", kind)
+		return nil, fmt.Errorf("proc kind=[%v] not registered", kind)
 	}
 
 	if proc == nil {
-		logger.Error("cannot create proc kind=[%v]", kind)
-		return nil
+		return nil, fmt.Errorf("proc kind=[%v] is nil", kind)
 	}
 
 	if proc.Side()&ProcSide_Server == 0 {
-		logger.Error("the created proc is not for server")
-		return nil
+		return nil, fmt.Errorf("proc is not for server")
 	}
 
-	return proc
+	return proc, nil
 }

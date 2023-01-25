@@ -10,6 +10,7 @@ import (
 	"github.com/djosix/med/internal"
 	"github.com/djosix/med/internal/helper"
 	"github.com/djosix/med/internal/initializer"
+	"github.com/djosix/med/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -26,6 +27,7 @@ const (
 	CommonFlagKeyHex              = "key"
 	CommonFlagKeyPath             = "keyPath"
 	CommonFlagUseRaw              = "useRaw"
+	CommonFlagVerbose             = "verbose"
 )
 
 func InitCommonFlags(cmd *cobra.Command) {
@@ -44,6 +46,7 @@ func InitCommonFlags(cmd *cobra.Command) {
 	flags.StringP(CommonFlagKeyHex, "k", "", "key (hex)")
 	flags.StringP(CommonFlagKeyPath, "K", "", "key file path")
 	flags.BoolP(CommonFlagUseRaw, "r", false, "disable encryption")
+	flags.IntP(CommonFlagVerbose, "v", int(logger.LevelInfo), "verbosity (0-5)")
 
 	cmd.MarkFlagsMutuallyExclusive(CommonFlagConnect, CommonFlagListen)
 	cmd.MarkFlagsMutuallyExclusive(CommonFlagPassword, CommonFlagPasswordPrompt)
@@ -270,6 +273,14 @@ func GetCommonOpts(cmd *cobra.Command, args []string) (*CommonOpts, error) {
 			return nil, err
 		}
 		opts.UseRaw = useRaw
+	}
+
+	{
+		verbose, err := flags.GetInt(CommonFlagVerbose)
+		if err != nil {
+			panic(CommonFlagVerbose)
+		}
+		logger.SetLevel(logger.LogLevel(verbose))
 	}
 
 	return &opts, nil

@@ -38,13 +38,19 @@ type MainProcMsg_Remove struct {
 
 // Client
 
-type MainProcClient struct {
-	ProcInfo
+type MainSpec struct {
+	IsTTY bool
 }
 
-func NewMainProcClient() *MainProcClient {
+type MainProcClient struct {
+	ProcInfo
+	MainSpec
+}
+
+func NewMainProcClient(spec MainSpec) *MainProcClient {
 	return &MainProcClient{
 		ProcInfo: NewProcInfo(ProcKind_Main, ProcSide_Client),
+		MainSpec: spec,
 	}
 }
 
@@ -62,8 +68,9 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 	startProcBySeqNo := map[uint32]procStartInfo{}
 
 	startProc := func(procKind ProcKind, spec any) {
-		proc := CreateProcClient(procKind, spec)
-		if proc == nil {
+		proc, err := CreateProcClient(procKind, spec)
+		if err != nil {
+			logger.Error("cannot create proc:", err)
 			return
 		}
 
@@ -217,14 +224,9 @@ func (p *MainProcServer) Run(ctx *ProcRunCtx) {
 
 	handleStart := func(data *MainProcMsg_Start) error {
 		// Create proc by kind
-		proc := CreateProcServer(data.ProcKind)
-		if proc == nil {
-			// Send error
-			ctx.PktOutCh <- &pb.Packet{
-				Kind: pb.PacketKind_PacketKindError,
-				Data: []byte(fmt.Sprintf("proc not created: kind=%v", data.ProcKind)),
-			}
-			return fmt.Errorf("not created")
+		proc, err := CreateProcServer(data.ProcKind)
+		if err != nil {
+			return fmt.Errorf("create proc: %w", err)
 		}
 
 		startProcID, startHandle := ctx.Loop.StartLater(proc)

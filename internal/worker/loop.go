@@ -121,6 +121,10 @@ func (loop *LoopImpl) Start(p Proc) (procID uint32) {
 }
 
 func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool)) {
+	if p == nil {
+		panic("p is nil")
+	}
+
 	loop.procLock.Lock()
 	defer loop.procLock.Unlock()
 

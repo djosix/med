@@ -16,11 +16,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// const (
-// 	ClientFlagExec  = "exec"
-// 	ClientFlagShell = "shell"
-// 	ClientFlagMenu  = "menu"
-// )
+const (
+	ClientFlagNoTTY = "notty"
+	ClientFlagShell = "shell"
+	ClientFlagMenu  = "menu"
+)
 
 func InitClientFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
@@ -28,8 +28,7 @@ func InitClientFlags(cmd *cobra.Command) {
 
 	// flags.StringP(ClientFlagExec, "x", "", "execute command")
 	// flags.StringP(ClientFlagShell, "z", "", "shell to execute command")
-	// flags.BoolP(ClientFlagMenu, "m", false, "display menu")
-
+	flags.BoolP(ClientFlagNoTTY, "T", false, "disable tty")
 	InitCommonFlags(cmd)
 }
 
@@ -38,35 +37,27 @@ func CheckClientFlags(cmd *cobra.Command, args []string) error {
 }
 
 type ClientOpts struct {
-	CommonOpts
-	SubArgs []string
+	*CommonOpts
+	IsTTY bool
+	Args  []string
 }
 
 func GetClientOpts(cmd *cobra.Command, args []string) (*ClientOpts, error) {
-	// flags := cmd.Flags()
+	flags := cmd.Flags()
+	opts := ClientOpts{Args: args}
 
-	// var err error
-	opts := ClientOpts{}
-
-	if cOpts, err := GetCommonOpts(cmd, args); err != nil {
+	var err error
+	if opts.CommonOpts, err = GetCommonOpts(cmd, args); err != nil {
 		return nil, err
-	} else {
-		opts.CommonOpts = *cOpts
 	}
 
-	opts.SubArgs = args
-
-	// if opts.Exec, err = flags.GetString(ClientFlagExec); err != nil {
-	// 	return nil, err
-	// }
-
-	// if opts.Shell, err = flags.GetString(ClientFlagShell); err != nil {
-	// 	return nil, err
-	// }
-
-	// if opts.ShowMenu, err = flags.GetBool(ClientFlagMenu); err != nil {
-	// 	return nil, err
-	// }
+	if noTTY, err := flags.GetBool(ClientFlagNoTTY); err != nil {
+		return nil, err
+	} else if noTTY {
+		opts.IsTTY = false
+	} else {
+		opts.IsTTY = isatty.IsTerminal(os.Stdin.Fd())
+	}
 
 	return &opts, nil
 }
@@ -127,22 +118,10 @@ func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
 		panic("cannot get opts from ctx")
 	}
 
-	// if len(opts.SubArgs) == 0 {
-
-	// }
-	argv := []string{"bash"}
-	if len(opts.SubArgs) != 0 {
-		argv = opts.SubArgs
+	rootProc, err := DetermineProc(opts.Args, opts.IsTTY)
+	if err != nil {
+		return err
 	}
-	fmt.Println("args:", opts.SubArgs)
-	// return nil
-
-	// rootProc := worker.NewExampleProc("message from client")
-	// rootProc := worker.NewMainProcClient()
-	rootProc := worker.NewExecProcClient(worker.ExecSpec{
-		ARGV: argv,
-		TTY:  isatty.IsTerminal(os.Stdin.Fd()),
-	})
 
 	// Send root proc kind to server
 	{
@@ -158,4 +137,25 @@ func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
 	loop.Run()
 
 	return nil
+}
+
+func DetermineProc(args []string, tty bool) (worker.Proc, error) {
+	defualtArgv := []string{"/bin/sh"}
+
+	if len(args) == 0 {
+		args = append([]string{"exec"}, defualtArgv...)
+	}
+
+	switch args[0] {
+	case "exec":
+		spec := worker.ExecSpec{TTY: tty, ARGV: args[1:]}
+		if len(spec.ARGV) == 0 {
+			spec.ARGV = defualtArgv
+		}
+		return worker.NewExecProcClient(spec), nil
+	case "menu":
+		return worker.NewMainProcClient(worker.MainSpec{IsTTY: tty}), nil
+	}
+
+	return nil, fmt.Errorf("cannot determine root proc")
 }

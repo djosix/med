@@ -35,7 +35,7 @@ var (
 
 func SetLevel(level LogLevel) {
 	if int(level) < 0 || int(level) >= len(logLevelText) {
-		panic("invalid level")
+		panic("invalid log level")
 	}
 	logLevel = level
 }
