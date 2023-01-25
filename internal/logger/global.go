@@ -15,6 +15,7 @@ const (
 	LevelWarn     LogLevel = 3
 	LevelError    LogLevel = 2
 	LevelFatal    LogLevel = 1
+	LevelNone     LogLevel = 0
 	logTimeFormat          = "2006-01-02 15:04:05"
 )
 

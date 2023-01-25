@@ -6,7 +6,8 @@ import (
 )
 
 func init() {
-	logger.SetLevel(logger.LevelInfo)
+	logger.SetLevel(logger.LevelDebug)
+	// logger.SetLevel(logger.LevelNone)
 	// logger.SetAddPrefix(false)
 
 	RootCmd.CompletionOptions = cobra.CompletionOptions{
