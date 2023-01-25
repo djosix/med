@@ -3,8 +3,14 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 */
 package main
 
-import "github.com/djosix/med/cmd"
+import (
+	"os"
+
+	"github.com/djosix/med/cmd"
+)
 
 func main() {
-	cmd.Execute()
+	if cmd.RootCmd.Execute() != nil {
+		os.Exit(1)
+	}
 }

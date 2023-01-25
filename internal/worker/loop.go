@@ -252,12 +252,11 @@ func (loop *LoopImpl) Stop() {
 		loop.procLock.Lock()
 		defer loop.procLock.Unlock()
 
-		logger := loopLogger.NewLogger("Cancel")
-		logger.Debug("cancel()")
+		loopLogger.Debug("cancel()")
 		loop.cancel()
 
 		if conn, ok := loop.ctx.Value("conn").(net.Conn); ok {
-			logger.Debug("BreakIO")
+			loopLogger.Debug("BreakIO")
 			helper.BreakIO(conn)
 		} else {
 			panic("cannot find conn in ctx")

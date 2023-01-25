@@ -1,6 +1,6 @@
-/*
-Copyright © 2023 NAME HERE <EMAIL ADDRESS>
-*/
+//go:build dev
+// +build dev
+
 package cmd
 
 import (
@@ -8,21 +8,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// testCmd represents the test command
-var testCmd = &cobra.Command{
-	Use: "test",
+// devCmd represents the test command
+var devCmd = &cobra.Command{
+	Use: "dev",
 	Run: func(cmd *cobra.Command, args []string) {
-		if err := mainForTest(cmd, args); err != nil {
-			logger.Print("error:", err)
-		}
+		logger.Print("error:", devMain(cmd, args))
 	},
 }
 
 func init() {
-	clientCmd.AddCommand(testCmd)
+	RootCmd.AddCommand(devCmd)
 }
 
-func mainForTest(cmd *cobra.Command, args []string) error {
+func devMain(cmd *cobra.Command, args []string) error {
 	_, _ = cmd, args
 
 	// r.Cancel()

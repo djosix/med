@@ -2,22 +2,43 @@
 
 # sudo apt install -y protobuf-compiler
 # go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+# sudo apt install -y upx
 
 set -e
 
 declare PROTO_DIR="./protobuf"
 declare BIN="./med"
 declare TARGET="$1"
-declare LDFLAGS=""
+declare TAGS=""
+
+shift
+if [[ $# == 0 ]]; then
+    TAGS="client server dev keygen"
+else
+    for tag in "$@"; do
+        TAGS="$TAGS,$tag"
+    done
+    TAGS="${TAGS#,}"
+    echo "tags = $TAGS"
+fi
 
 case "$TARGET" in
-    debug)   LDFLAGS="" ;;
-    release) LDFLAGS="-w -s" ;;
-    *)       >&2 echo "error: unexpected target: $TARGET" && exit 1  ;;
+    debug)
+        rm -f "$BIN"
+        protoc -I="$PROTO_DIR" --go_out=. "$PROTO_DIR/med.proto"
+        go build -tags="$TAGS" -o "$BIN" ./main.go
+        ;;
+    release)
+        rm -f "$BIN"
+        protoc -I="$PROTO_DIR" --go_out=. "$PROTO_DIR/med.proto"
+        go build -ldflags="-s -w" -tags="$TAGS" -o "$BIN" ./main.go
+        upx -9 "$BIN"
+        ;;
+    *)
+        >&2 echo "error: unexpected target: $TARGET"
+        exit 1
+        ;;
 esac
 
 set -x
     
-rm -f "$BIN"
-protoc -I="$PROTO_DIR" --go_out=. "$PROTO_DIR/med.proto"
-go build -ldflags="$LDFLAGS" -o "$BIN" ./main.go

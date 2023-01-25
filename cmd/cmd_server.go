@@ -1,6 +1,6 @@
-/*
-Copyright © 2023 NAME HERE <EMAIL ADDRESS>
-*/
+//go:build server
+// +build server
+
 package cmd
 
 import (
@@ -16,6 +16,5 @@ var serverCmd = &cobra.Command{
 }
 
 func init() {
-	clientCmd.AddCommand(serverCmd)
 	handler.InitServerFlags(serverCmd)
 }

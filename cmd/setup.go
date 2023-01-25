@@ -1,16 +1,15 @@
 package cmd
 
 import (
-	"os"
-
 	"github.com/djosix/med/internal/logger"
+	"github.com/spf13/cobra"
 )
 
-func Execute() {
+func init() {
 	logger.SetLevel(logger.LevelDebug)
 	// logger.SetAddPrefix(false)
-	err := clientCmd.Execute()
-	if err != nil {
-		os.Exit(1)
+
+	RootCmd.CompletionOptions = cobra.CompletionOptions{
+		DisableDefaultCmd: true,
 	}
 }

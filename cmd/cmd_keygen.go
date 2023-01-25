@@ -1,3 +1,6 @@
+//go:build keygen
+// +build keygen
+
 package cmd
 
 import (
@@ -59,5 +62,5 @@ var keygenCmd = &cobra.Command{
 }
 
 func init() {
-	clientCmd.AddCommand(keygenCmd)
+	RootCmd.AddCommand(keygenCmd)
 }
