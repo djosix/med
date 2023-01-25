@@ -263,7 +263,7 @@ func GetCommonOpts(cmd *cobra.Command, args []string) (*CommonOpts, error) {
 		}
 	} else {
 		opts.TrustedPublicKeys = []ed25519.PublicKey{
-			initializer.DefaultPublicKey,
+			initializer.DefaultTrustedPublicKey,
 		}
 	}
 

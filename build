@@ -23,22 +23,21 @@ else
 fi
 
 case "$TARGET" in
-    debug)
-        rm -f "$BIN"
+    debug) (
+        rm -fv "$BIN"
+        set -x
         protoc -I="$PROTO_DIR" --go_out=. "$PROTO_DIR/med.proto"
         go build -tags="$TAGS dev" -o "$BIN" ./main.go
-        ;;
-    release)
-        rm -f "$BIN"
+    ) ;;
+    release) (
+        rm -fv "$BIN"
+        set -x
         protoc -I="$PROTO_DIR" --go_out=. "$PROTO_DIR/med.proto"
         go build -ldflags="-s -w" -tags="$TAGS" -o "$BIN" ./main.go
         upx -9 "$BIN"
-        ;;
+    ) ;;
     *)
         >&2 echo "error: unexpected target: $TARGET"
         exit 1
         ;;
 esac
-
-set -x
-    
