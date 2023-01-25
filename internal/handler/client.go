@@ -2,11 +2,14 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/djosix/med/internal"
+	"github.com/djosix/med/internal/helper"
 	"github.com/djosix/med/internal/initializer"
 	"github.com/djosix/med/internal/logger"
+	"github.com/djosix/med/internal/readwriter"
 	"github.com/djosix/med/internal/worker"
 	"github.com/spf13/cobra"
 )
@@ -115,16 +118,22 @@ func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
 	logger.Debug("start")
 	defer logger.Debug("done")
 
-	var loop worker.Loop = worker.NewLoop(ctx, rw)
+	// rootProc := worker.NewExampleProc("message from client")
+	// rootProc := worker.NewMainProcClient()
+	rootProc := worker.NewExecProcClient(worker.ExecSpec{
+		ARGV: []string{"bash"},
+		TTY:  true,
+	})
 	{
-
-		// loop.Start(worker.NewExampleProc("message from client"))
-		loop.Start(worker.NewExecProcClient(worker.ExecSpec{
-			ARGV: []string{"bash"},
-			TTY:  true,
-		}))
-		// loop.Start(worker.NewMainProcClient())
+		frameRw := readwriter.NewPlainFrameReadWriter(rw)
+		frame := helper.MustEncode(rootProc.Kind())
+		if err := frameRw.WriteFrame(frame); err != nil {
+			return fmt.Errorf("cannot write root proc kind: %w", err)
+		}
 	}
+
+	loop := worker.NewLoop(ctx, rw)
+	loop.Start(rootProc)
 	loop.Run()
 
 	return nil
