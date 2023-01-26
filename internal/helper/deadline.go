@@ -4,14 +4,14 @@ import (
 	"time"
 )
 
-type CanSetDeadline interface {
+type Deadlined interface {
 	SetDeadline(t time.Time) error
 }
 
-func BreakIO(s CanSetDeadline) error {
+func BreakIO(s Deadlined) error {
 	return s.SetDeadline(time.Unix(1, 0))
 }
 
-func RefreshIO(s CanSetDeadline) error {
+func RefreshIO(s Deadlined) error {
 	return s.SetDeadline(time.Unix(10000000000, 0))
 }

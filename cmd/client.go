@@ -1,6 +1,3 @@
-//go:build client
-// +build client
-
 package cmd
 
 import (
@@ -8,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var clientCmd = &cobra.Command{
+var ClientCmd = &cobra.Command{
 	Use:     "med",
 	Run:     handler.ClientMain,
 	Args:    cobra.ArbitraryArgs,
@@ -16,5 +13,5 @@ var clientCmd = &cobra.Command{
 }
 
 func init() {
-	handler.InitClientFlags(clientCmd)
+	handler.InitClientFlags(ClientCmd)
 }

@@ -24,7 +24,7 @@ var (
 	logLevel     LogLevel  = LevelInfo
 	logLevelText           = [6]string{
 		"",
-		"Fatal",
+		"FATAL",
 		"ERROR",
 		"WARN",
 		"INFO",

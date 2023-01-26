@@ -1,6 +1,3 @@
-//go:build server
-// +build server
-
 package cmd
 
 import (
@@ -8,7 +5,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var serverCmd = &cobra.Command{
+var ServerCmd = &cobra.Command{
 	Use:     "server",
 	Short:   "Start a med server",
 	Run:     handler.ServerMain,
@@ -16,5 +13,5 @@ var serverCmd = &cobra.Command{
 }
 
 func init() {
-	handler.InitServerFlags(serverCmd)
+	handler.InitServerFlags(ServerCmd)
 }

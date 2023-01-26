@@ -17,17 +17,12 @@ import (
 )
 
 const (
-	ClientFlagNoTTY   = "notty"
-	ClientFlagHistory = "shell"
-	ClientFlagMenu    = "menu"
+	ClientFlagNoTTY = "notty"
 )
 
 func InitClientFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.SortFlags = false
-
-	// flags.StringP(ClientFlagExec, "x", "", "execute command")
-	// flags.StringP(ClientFlagShell, "z", "", "shell to execute command")
 	flags.BoolP(ClientFlagNoTTY, "T", false, "disable tty")
 	InitCommonFlags(cmd)
 }
@@ -140,20 +135,27 @@ func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
 }
 
 func DetermineProc(args []string, tty bool) (worker.Proc, error) {
-	defualtArgv := []string{"/bin/sh"}
+	defaultArgv := []string{"/bin/sh"}
 
 	if len(args) == 0 {
-		args = append([]string{"exec"}, defualtArgv...)
+		args = append([]string{"exec"}, defaultArgv...)
 	}
 
 	switch args[0] {
 	case "exec":
 		spec := worker.ExecSpec{TTY: tty, ARGV: args[1:]}
 		if len(spec.ARGV) == 0 {
-			spec.ARGV = defualtArgv
+			spec.ARGV = defaultArgv
 		}
 		return worker.NewExecProcClient(spec), nil
-	case "menu":
+	case "get":
+	case "put":
+	case "forward":
+	case "proxy":
+	case "self":
+	case "webui":
+	case "tmux":
+	case "cli":
 		return worker.NewMainProcClient(worker.MainSpec{IsTTY: tty}), nil
 	}
 

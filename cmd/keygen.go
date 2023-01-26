@@ -1,6 +1,3 @@
-//go:build keygen
-// +build keygen
-
 package cmd
 
 import (
@@ -13,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var keygenCmd = &cobra.Command{
+var KeygenCmd = &cobra.Command{
 	Use:   "keygen",
 	Short: "Generate med key pairs",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -59,8 +56,4 @@ var keygenCmd = &cobra.Command{
 			}
 		}
 	},
-}
-
-func init() {
-	RootCmd.AddCommand(keygenCmd)
 }

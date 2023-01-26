@@ -26,8 +26,7 @@ type Loop interface {
 	Start(h Proc) uint32                                  // Start a Proc
 	StartLater(p Proc) (procID uint32, handle func(bool)) // Start a Proc later
 	Remove(id uint32) bool                                // Remove a Proc
-	Done() <-chan struct{}                                // Get the done chan of ctx
-	Context() context.Context                             // Get the ctx of loop
+	Done() <-chan struct{}                                // Get the done chan of loop ctx
 	Stop()                                                // Stop the loop
 }
 
@@ -88,8 +87,6 @@ func (loop *LoopImpl) Run() {
 	logger := loopLogger.NewLogger("Run")
 	logger.Debug("start")
 	defer logger.Debug("done")
-
-	loop.stopOnce = sync.Once{}
 
 	for _, loopFunc := range []func(){
 		loop.reader,
@@ -243,10 +240,6 @@ func (loop *LoopImpl) Remove(procID uint32) bool {
 	return ok
 }
 
-func (loop *LoopImpl) Context() context.Context {
-	return loop.ctx
-}
-
 func (loop *LoopImpl) Done() <-chan struct{} {
 	return loop.ctx.Done()
 }
@@ -289,6 +282,8 @@ func (loop *LoopImpl) reader() {
 			loop.Remove(pkt.TargetID)
 			continue
 		}
+
+		// XXX: select?
 		loop.pktInCh <- &pkt
 	}
 }

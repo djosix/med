@@ -1,6 +1,3 @@
-//go:build dev
-// +build dev
-
 package cmd
 
 import (
@@ -8,16 +5,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// devCmd represents the test command
-var devCmd = &cobra.Command{
+// DevCmd represents the test command
+var DevCmd = &cobra.Command{
 	Use: "dev",
 	Run: func(cmd *cobra.Command, args []string) {
 		logger.Print("error:", devMain(cmd, args))
 	},
-}
-
-func init() {
-	RootCmd.AddCommand(devCmd)
 }
 
 func devMain(cmd *cobra.Command, args []string) error {
