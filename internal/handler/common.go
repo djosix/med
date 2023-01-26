@@ -20,27 +20,27 @@ const (
 	CommonFlagConnectP        = "c"
 	CommonFlagListen          = "listen"
 	CommonFlagListenP         = "l"
-	CommonFlagMaxConn         = "maxConn"
+	CommonFlagMaxConn         = "max-conn"
 	CommonFlagMaxConnP        = "C"
-	CommonFlagConnDelay       = "connDelay"
+	CommonFlagConnDelay       = "conn-delay"
 	CommonFlagConnDelayP      = "D"
 	CommonFlagPassword        = "passwd"
 	CommonFlagPasswordP       = "w"
-	CommonFlagPasswordPrompt  = "promptPasswd"
+	CommonFlagPasswordPrompt  = "prompt-passwd"
 	CommonFlagPasswordPromptP = "W"
 	CommonFlagSecret          = "secret"
 	CommonFlagSecretP         = "s"
-	CommonFlagSecretPrompt    = "promptSecret"
+	CommonFlagSecretPrompt    = "prompt-secret"
 	CommonFlagSecretPromptP   = "S"
 	CommonFlagTrustPubHex     = "pub"
 	CommonFlagTrustPubHexP    = "p"
-	CommonFlagTrustPubPath    = "pubPath"
+	CommonFlagTrustPubPath    = "pub-path"
 	CommonFlagTrustPubPathP   = "P"
 	CommonFlagKeyHex          = "key"
 	CommonFlagKeyHexP         = "k"
-	CommonFlagKeyPath         = "keyPath"
+	CommonFlagKeyPath         = "key-path"
 	CommonFlagKeyPathP        = "K"
-	CommonFlagUseRaw          = "useRaw"
+	CommonFlagUseRaw          = "use-raw"
 	CommonFlagUseRawP         = "r"
 	CommonFlagVerbose         = "verbose"
 	CommonFlagVerboseP        = "v"
@@ -50,20 +50,20 @@ func InitCommonFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.SortFlags = false
 
-	flags.StringP(CommonFlagConnect, CommonFlagConnectP, "", "target to connect")
-	flags.StringP(CommonFlagListen, CommonFlagListenP, "", "endpoint to listen on")
-	flags.DurationP(CommonFlagConnDelay, CommonFlagConnDelayP, 0, "reconnecting delay if connecting; only effective when it is positive")
-	flags.IntP(CommonFlagMaxConn, CommonFlagMaxConnP, 1024, "max number of connections at a time if listening")
-	flags.StringP(CommonFlagPassword, CommonFlagPasswordP, "", "the server password")
-	flags.BoolP(CommonFlagPasswordPrompt, CommonFlagPasswordPromptP, false, "prompt for the server password")
-	flags.StringP(CommonFlagSecret, CommonFlagSecretP, "", "shared secret")
-	flags.BoolP(CommonFlagSecretPrompt, CommonFlagSecretPromptP, false, "prompt for shared secret")
-	flags.StringArrayP(CommonFlagTrustPubHex, CommonFlagTrustPubHexP, []string{}, "trusted public key (hex)")
-	flags.StringArrayP(CommonFlagTrustPubPath, CommonFlagTrustPubPathP, []string{}, "trusted public key file path")
-	flags.StringP(CommonFlagKeyHex, CommonFlagKeyHexP, "", "key (hex)")
-	flags.StringP(CommonFlagKeyPath, CommonFlagKeyPathP, "", "key file path")
-	flags.BoolP(CommonFlagUseRaw, CommonFlagUseRawP, false, "disable encryption")
-	flags.IntP(CommonFlagVerbose, CommonFlagVerboseP, int(logger.LevelInfo), "verbosity (0-5)")
+	flags.StringP(CommonFlagConnect, CommonFlagConnectP, "", "endpoint to connect to, like \"[HOST]:PORT\" or \"unix:PATH\"")
+	flags.StringP(CommonFlagListen, CommonFlagListenP, "", "endpoint to listen on, like \"[HOST]:PORT\" or \"unix:PATH\"")
+	flags.DurationP(CommonFlagConnDelay, CommonFlagConnDelayP, 0, fmt.Sprintf("reconnection delay if using --%s\nany non-positive duration means connecting once", CommonFlagConnect))
+	flags.IntP(CommonFlagMaxConn, CommonFlagMaxConnP, 64, fmt.Sprintf("max number of connections at a time if using --%s", CommonFlagListen))
+	flags.StringP(CommonFlagPassword, CommonFlagPasswordP, "", "the password used by the server to authenticate clients")
+	flags.BoolP(CommonFlagPasswordPrompt, CommonFlagPasswordPromptP, false, "prompt user for the password")
+	flags.StringP(CommonFlagSecret, CommonFlagSecretP, "", "shared secret for symmetric encryption. If specified\nkey exchange handshake will be disabled")
+	flags.BoolP(CommonFlagSecretPrompt, CommonFlagSecretPromptP, false, "prompt user for the shared secret")
+	flags.StringArrayP(CommonFlagTrustPubHex, CommonFlagTrustPubHexP, []string{}, "hex-encoded trusted public key(s)")
+	flags.StringArrayP(CommonFlagTrustPubPath, CommonFlagTrustPubPathP, []string{}, "trusted public key file path(s)")
+	flags.StringP(CommonFlagKeyHex, CommonFlagKeyHexP, "", "hex-encoded private key")
+	flags.StringP(CommonFlagKeyPath, CommonFlagKeyPathP, "", "private key file path")
+	flags.BoolP(CommonFlagUseRaw, CommonFlagUseRawP, false, "disable any encryption or compression.")
+	flags.IntP(CommonFlagVerbose, CommonFlagVerboseP, int(logger.LevelInfo), "verbosity, 0-5")
 
 	cmd.MarkFlagsMutuallyExclusive(CommonFlagConnect, CommonFlagListen)
 	cmd.MarkFlagsMutuallyExclusive(CommonFlagPassword, CommonFlagPasswordPrompt)

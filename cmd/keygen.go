@@ -11,7 +11,7 @@ import (
 )
 
 var KeygenCmd = &cobra.Command{
-	Use:   "keygen",
+	Use:   "keygen [paths]",
 	Short: "Generate med key pairs",
 	Run: func(cmd *cobra.Command, args []string) {
 		_, _ = cmd, args

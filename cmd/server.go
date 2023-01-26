@@ -6,7 +6,7 @@ import (
 )
 
 var ServerCmd = &cobra.Command{
-	Use:     "server",
+	Use:     "server {-c endpoint|-l endpoint}",
 	Short:   "Start a med server",
 	Run:     handler.ServerMain,
 	PreRunE: handler.CheckServerFlags,

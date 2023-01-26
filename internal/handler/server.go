@@ -25,9 +25,6 @@ func InitServerFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.SortFlags = false
 
-	flags.BoolP(ServerFlagDaemon, "d", false, "run as a daemon")
-	flags.DurationP(ServerFlagInterval, "i", time.Duration(0)*time.Second, "with --connect, connect back interval, 0s for no loop")
-
 	InitCommonFlags(cmd)
 }
 

@@ -6,7 +6,7 @@ import (
 )
 
 var ClientCmd = &cobra.Command{
-	Use:     "med",
+	Use:     "client {-c endpoint|-l endpoint} [flags] [args]",
 	Run:     handler.ClientMain,
 	Args:    cobra.ArbitraryArgs,
 	PreRunE: handler.CheckClientFlags,
