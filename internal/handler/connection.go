@@ -17,7 +17,6 @@ func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) 
 	logger := logger.NewLogger("Listen")
 	logger.Info("bind on", endpoint)
 
-	logger.Debug("est")
 	var listener net.Listener
 	{
 		network, address := splitEndpoint(endpoint)

@@ -265,11 +265,12 @@ func (loop *LoopImpl) reader() {
 	logger := loopLogger.NewLogger("reader")
 	logger.Debug("start")
 	defer logger.Debug("done")
+	defer close(loop.pktInCh)
 
 	for {
 		frame, err := loop.frameRw.ReadFrame()
 		if err != nil {
-			logger.Debug("ReadFrame:", err)
+			logger.Debug("read frame:", err)
 			return
 		}
 		pkt := pb.Packet{}
@@ -283,8 +284,11 @@ func (loop *LoopImpl) reader() {
 			continue
 		}
 
-		// XXX: select?
-		loop.pktInCh <- &pkt
+		select {
+		case loop.pktInCh <- &pkt:
+		case <-loop.Done():
+			return
+		}
 	}
 }
 
@@ -314,29 +318,21 @@ func (loop *LoopImpl) dispatcher() {
 		return nil
 	}
 
-	for {
-		select {
-		case pkt := <-loop.pktInCh:
-			if pkt == nil {
+	for pkt := range loop.pktInCh {
+		if err := dispatchToProc(pkt); err != nil {
+			logger.Debugf("dispatch error for packet [%v]: %v", pkt, err)
+			pkt := &pb.Packet{
+				TargetID: pkt.SourceID,
+				SourceID: pkt.TargetID,
+				Kind:     pb.PacketKind_PacketKindError,
+				Data:     []byte(err.Error()),
+			}
+
+			select {
+			case loop.pktOutCh <- pkt:
+			case <-loop.ctx.Done():
 				return
 			}
-			if err := dispatchToProc(pkt); err != nil {
-				logger.Debugf("dispatch error for packet [%v]: %v", pkt, err)
-				pkt := &pb.Packet{
-					TargetID: pkt.SourceID,
-					SourceID: pkt.TargetID,
-					Kind:     pb.PacketKind_PacketKindError,
-					Data:     []byte(err.Error()),
-				}
-
-				select {
-				case loop.pktOutCh <- pkt:
-				case <-loop.ctx.Done():
-					return
-				}
-			}
-		case <-loop.ctx.Done():
-			return
 		}
 	}
 }
@@ -348,19 +344,20 @@ func (loop *LoopImpl) writer() {
 
 	for {
 		select {
-		case pkt := <-loop.pktOutCh:
-			if pkt == nil {
-				logger.Error("MedPkt from loop.outPktCh is nil")
+		case pkt, ok := <-loop.pktOutCh:
+			if !ok {
+				logger.Error("packet output closed")
 				return
 			}
+
 			buf, err := proto.Marshal(pkt)
 			if err != nil {
-				panic("cannot marshal MedPkt")
+				panic("cannot encode packet")
 			}
 
 			err = loop.frameRw.WriteFrame(buf)
 			if err != nil {
-				logger.Error("WriteFrame:", err)
+				logger.Error("write frame:", err)
 				return
 			}
 		case <-loop.ctx.Done():
