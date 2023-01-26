@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/djosix/med/internal"
 	"github.com/djosix/med/internal/helper"
@@ -16,10 +15,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	ServerFlagDaemon   = "daemon"
-	ServerFlagInterval = "interval"
-)
+const ()
 
 func InitServerFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
@@ -37,28 +33,14 @@ func CheckServerFlags(cmd *cobra.Command, args []string) (err error) {
 }
 
 type ServerOpts struct {
-	CommonOpts
-	IsDaemon bool
-	Interval time.Duration
+	*CommonOpts
 }
 
 func GetServerOpts(cmd *cobra.Command, args []string) (*ServerOpts, error) {
-	flags := cmd.Flags()
-
-	var err error
 	opts := ServerOpts{}
 
-	if cOpts, err := GetCommonOpts(cmd, args); err != nil {
-		return nil, err
-	} else {
-		opts.CommonOpts = *cOpts
-	}
-
-	if opts.IsDaemon, err = flags.GetBool(ServerFlagDaemon); err != nil {
-		return nil, err
-	}
-
-	if opts.Interval, err = flags.GetDuration(ServerFlagInterval); err != nil {
+	var err error
+	if opts.CommonOpts, err = GetCommonOpts(cmd, args); err != nil {
 		return nil, err
 	}
 
