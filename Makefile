@@ -1,6 +1,6 @@
 SRC := $(shell find . -name '*.go')
 
-med medc meds dev: $(SRC)
+med: $(SRC)
 	go build -ldflags="-s -w" -o $@ cmd/$(@F)/main.go
 
 internal/protobuf/med.pb.go: protobuf/med.proto

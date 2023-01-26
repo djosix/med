@@ -320,7 +320,8 @@ func (loop *LoopImpl) dispatcher() {
 
 	for pkt := range loop.pktInCh {
 		if err := dispatchToProc(pkt); err != nil {
-			logger.Debugf("dispatch error for packet [%v]: %v", pkt, err)
+			logger.Debugf("dispatch error for [%v]: %v", pkt, err)
+
 			pkt := &pb.Packet{
 				TargetID: pkt.SourceID,
 				SourceID: pkt.TargetID,
