@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/djosix/med/internal"
 	"github.com/djosix/med/internal/helper"
@@ -15,38 +16,54 @@ import (
 )
 
 const (
-	CommonFlagConnect             = "connect"
-	CommonFlagListen              = "listen"
-	CommonFlagMaxConn             = "maxConn"
-	CommonFlagPassword            = "passwd"
-	CommonFlagPasswordPrompt      = "promptPasswd"
-	CommonFlagSecret              = "secret"
-	CommonFlagSecretPrompt        = "promptSecret"
-	CommonFlagTrustedPublicKeyHex = "pub"
-	CommonFlagPublicKeyPath       = "pubPath"
-	CommonFlagKeyHex              = "key"
-	CommonFlagKeyPath             = "keyPath"
-	CommonFlagUseRaw              = "useRaw"
-	CommonFlagVerbose             = "verbose"
+	CommonFlagConnect         = "connect"
+	CommonFlagConnectP        = "c"
+	CommonFlagListen          = "listen"
+	CommonFlagListenP         = "l"
+	CommonFlagMaxConn         = "maxConn"
+	CommonFlagMaxConnP        = "C"
+	CommonFlagConnDelay       = "connDelay"
+	CommonFlagConnDelayP      = "D"
+	CommonFlagPassword        = "passwd"
+	CommonFlagPasswordP       = "w"
+	CommonFlagPasswordPrompt  = "promptPasswd"
+	CommonFlagPasswordPromptP = "W"
+	CommonFlagSecret          = "secret"
+	CommonFlagSecretP         = "s"
+	CommonFlagSecretPrompt    = "promptSecret"
+	CommonFlagSecretPromptP   = "S"
+	CommonFlagTrustPubHex     = "pub"
+	CommonFlagTrustPubHexP    = "p"
+	CommonFlagTrustPubPath    = "pubPath"
+	CommonFlagTrustPubPathP   = "P"
+	CommonFlagKeyHex          = "key"
+	CommonFlagKeyHexP         = "k"
+	CommonFlagKeyPath         = "keyPath"
+	CommonFlagKeyPathP        = "K"
+	CommonFlagUseRaw          = "useRaw"
+	CommonFlagUseRawP         = "r"
+	CommonFlagVerbose         = "verbose"
+	CommonFlagVerboseP        = "v"
 )
 
 func InitCommonFlags(cmd *cobra.Command) {
 	flags := cmd.Flags()
 	flags.SortFlags = false
 
-	flags.StringP(CommonFlagConnect, "c", "", "target to connect")
-	flags.StringP(CommonFlagListen, "l", "", "endpoint to listen on")
-	flags.IntP(CommonFlagMaxConn, "C", 1024, "max number of connections")
-	flags.StringP(CommonFlagPassword, "w", "", "the server password")
-	flags.BoolP(CommonFlagPasswordPrompt, "W", false, "prompt for the server password")
-	flags.StringP(CommonFlagSecret, "s", "", "shared secret")
-	flags.BoolP(CommonFlagSecretPrompt, "S", false, "prompt for shared secret")
-	flags.StringArrayP(CommonFlagTrustedPublicKeyHex, "p", []string{}, "trusted public key (hex)")
-	flags.StringArrayP(CommonFlagPublicKeyPath, "P", []string{}, "trusted public key file path")
-	flags.StringP(CommonFlagKeyHex, "k", "", "key (hex)")
-	flags.StringP(CommonFlagKeyPath, "K", "", "key file path")
-	flags.BoolP(CommonFlagUseRaw, "r", false, "disable encryption")
-	flags.IntP(CommonFlagVerbose, "v", int(logger.LevelInfo), "verbosity (0-5)")
+	flags.StringP(CommonFlagConnect, CommonFlagConnectP, "", "target to connect")
+	flags.StringP(CommonFlagListen, CommonFlagListenP, "", "endpoint to listen on")
+	flags.DurationP(CommonFlagConnDelay, CommonFlagConnDelayP, 0, "reconnecting delay if connecting; only effective when it is positive")
+	flags.IntP(CommonFlagMaxConn, CommonFlagMaxConnP, 1024, "max number of connections at a time if listening")
+	flags.StringP(CommonFlagPassword, CommonFlagPasswordP, "", "the server password")
+	flags.BoolP(CommonFlagPasswordPrompt, CommonFlagPasswordPromptP, false, "prompt for the server password")
+	flags.StringP(CommonFlagSecret, CommonFlagSecretP, "", "shared secret")
+	flags.BoolP(CommonFlagSecretPrompt, CommonFlagSecretPromptP, false, "prompt for shared secret")
+	flags.StringArrayP(CommonFlagTrustPubHex, CommonFlagTrustPubHexP, []string{}, "trusted public key (hex)")
+	flags.StringArrayP(CommonFlagTrustPubPath, CommonFlagTrustPubPathP, []string{}, "trusted public key file path")
+	flags.StringP(CommonFlagKeyHex, CommonFlagKeyHexP, "", "key (hex)")
+	flags.StringP(CommonFlagKeyPath, CommonFlagKeyPathP, "", "key file path")
+	flags.BoolP(CommonFlagUseRaw, CommonFlagUseRawP, false, "disable encryption")
+	flags.IntP(CommonFlagVerbose, CommonFlagVerboseP, int(logger.LevelInfo), "verbosity (0-5)")
 
 	cmd.MarkFlagsMutuallyExclusive(CommonFlagConnect, CommonFlagListen)
 	cmd.MarkFlagsMutuallyExclusive(CommonFlagPassword, CommonFlagPasswordPrompt)
@@ -60,42 +77,53 @@ func CheckCommonFlags(cmd *cobra.Command, args []string) error {
 	flags := cmd.Flags()
 
 	if flags.Changed(CommonFlagConnect) == flags.Changed(CommonFlagListen) {
-		return fmt.Errorf("expect either --connect/-c or --listen/-l")
+		return fmt.Errorf("expect either --%s/-%s or --%s/-%s",
+			CommonFlagConnect, CommonFlagConnectP,
+			CommonFlagListen, CommonFlagListenP,
+		)
 	}
 
-	hasCustomSecret := flags.Changed(CommonFlagSecret) || flags.Changed(CommonFlagSecretPrompt)
-	hasCustomRemotePublicKeys := flags.Changed(CommonFlagTrustedPublicKeyHex) || flags.Changed(CommonFlagPublicKeyPath)
-	hasCustomKeyPair := flags.Changed(CommonFlagKeyHex) || flags.Changed(CommonFlagKeyPath)
+	// Check crypto-related flags
+	{
+		hasCustomSecret := flags.Changed(CommonFlagSecret) || flags.Changed(CommonFlagSecretPrompt)
+		hasCustomRemotePublicKeys := flags.Changed(CommonFlagTrustPubHex) || flags.Changed(CommonFlagTrustPubPath)
+		hasCustomKeyPair := flags.Changed(CommonFlagKeyHex) || flags.Changed(CommonFlagKeyPath)
 
-	useRaw, err := flags.GetBool(CommonFlagUseRaw)
-	if err != nil {
-		panic(err)
-	}
+		useRaw, err := flags.GetBool(CommonFlagUseRaw)
+		if err != nil {
+			panic(err)
+		}
 
-	if useRaw && (hasCustomSecret || hasCustomRemotePublicKeys || hasCustomKeyPair) {
-		return fmt.Errorf("crypto related flags passed but encryption is disabled")
-	}
+		if useRaw && (hasCustomSecret || hasCustomRemotePublicKeys || hasCustomKeyPair) {
+			return fmt.Errorf("crypto related flags passed but encryption is disabled")
+		}
 
-	if hasCustomSecret && (hasCustomRemotePublicKeys || hasCustomKeyPair) {
-		return fmt.Errorf("keys are useless when secret is pre-shared")
+		if hasCustomSecret && (hasCustomRemotePublicKeys || hasCustomKeyPair) {
+			return fmt.Errorf("keys are useless when secret is pre-shared")
+		}
 	}
 
 	if flags.Changed(CommonFlagMaxConn) && !flags.Changed(CommonFlagListen) {
-		return fmt.Errorf("--maxConn can only be used with --listen")
+		return fmt.Errorf("--%s can only be used with --%s", CommonFlagMaxConn, CommonFlagListen)
+	}
+
+	if flags.Changed(CommonFlagConnDelay) && !flags.Changed(CommonFlagConnect) {
+		return fmt.Errorf("--%s can only be used with --%s", CommonFlagConnDelay, CommonFlagConnect)
 	}
 
 	return nil
 }
 
 type CommonOpts struct {
-	Mode              string
-	Endpoint          string
-	MaxConnIfListen   int
-	PasswordHash      []byte
-	SecretHash        []byte
-	PrivateKey        ed25519.PrivateKey
-	TrustedPublicKeys []ed25519.PublicKey
-	UseRaw            bool
+	Mode               string
+	Endpoint           string
+	MaxConnIfListen    int
+	ConnDelayIfConnect time.Duration
+	PasswordHash       []byte
+	SecretHash         []byte
+	PrivateKey         ed25519.PrivateKey
+	TrustedPublicKeys  []ed25519.PublicKey
+	UseRaw             bool
 }
 
 func GetCommonOpts(cmd *cobra.Command, args []string) (*CommonOpts, error) {
@@ -130,10 +158,13 @@ func GetCommonOpts(cmd *cobra.Command, args []string) (*CommonOpts, error) {
 	if maxConn, err := flags.GetInt(CommonFlagMaxConn); err != nil {
 		return nil, err
 	} else {
-		if maxConn < 0 {
-			return nil, fmt.Errorf("--maxConn cannot be negative")
-		}
 		opts.MaxConnIfListen = maxConn
+	}
+
+	if connDelay, err := flags.GetDuration(CommonFlagConnDelay); err != nil {
+		return nil, err
+	} else {
+		opts.ConnDelayIfConnect = time.Duration(connDelay)
 	}
 
 	if flags.Changed(CommonFlagPassword) {
@@ -213,8 +244,8 @@ func GetCommonOpts(cmd *cobra.Command, args []string) (*CommonOpts, error) {
 		opts.PrivateKey = initializer.DefaultPrivateKey
 	}
 
-	if flags.Changed(CommonFlagTrustedPublicKeyHex) {
-		hexStrArr, err := flags.GetStringArray(CommonFlagTrustedPublicKeyHex)
+	if flags.Changed(CommonFlagTrustPubHex) {
+		hexStrArr, err := flags.GetStringArray(CommonFlagTrustPubHex)
 		if err != nil {
 			panic(err)
 		}
@@ -225,8 +256,8 @@ func GetCommonOpts(cmd *cobra.Command, args []string) (*CommonOpts, error) {
 			}
 			opts.TrustedPublicKeys = append(opts.TrustedPublicKeys, ed25519.PublicKey(data))
 		}
-	} else if flags.Changed(CommonFlagPublicKeyPath) {
-		pathArr, err := flags.GetStringArray(CommonFlagPublicKeyPath)
+	} else if flags.Changed(CommonFlagTrustPubPath) {
+		pathArr, err := flags.GetStringArray(CommonFlagTrustPubPath)
 		if err != nil {
 			panic(err)
 		}

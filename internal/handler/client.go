@@ -95,9 +95,11 @@ func ClientStart(ctx context.Context, opts *ClientOpts) error {
 
 	switch opts.Mode {
 	case CommonFlagConnect:
-		return Connect(ctx, opts.Endpoint, handler)
+		return Connect(ctx, opts.Endpoint, handler, opts.ConnDelayIfConnect)
+
 	case CommonFlagListen:
 		return Listen(ctx, opts.Endpoint, handler, 1)
+
 	default:
 		panic(internal.Unexpected)
 	}

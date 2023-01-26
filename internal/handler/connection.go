@@ -8,10 +8,41 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/djosix/med/internal/helper"
 	"github.com/djosix/med/internal/logger"
 )
+
+func Connect(ctx context.Context, endpoint string, handler Handler, connInt time.Duration) error {
+	logger := logger.NewLogger("Connect")
+	logger.Info("target", endpoint)
+
+	connect := func() error {
+		conn, err := net.Dial(splitEndpoint(endpoint))
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+
+		logger.Info("connected to", conn.RemoteAddr())
+
+		ctx := context.WithValue(ctx, "conn", conn)
+		if err = handler(ctx, conn); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	for {
+		err := connect()
+		if connInt <= 0 {
+			return err
+		}
+		time.Sleep(connInt)
+	}
+}
 
 func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) error {
 	logger := logger.NewLogger("Listen")
@@ -77,27 +108,6 @@ func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) 
 	}
 
 	wg.Wait()
-
-	return nil
-}
-
-func Connect(ctx context.Context, endpoint string, handler Handler) error {
-	logger := logger.NewLogger("Connect")
-	logger.Info("target", endpoint)
-
-	conn, err := net.Dial(splitEndpoint(endpoint))
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	logger.Info("connected to", conn.RemoteAddr())
-
-	ctx = context.WithValue(ctx, "conn", conn)
-	err = handler(ctx, conn)
-	if err != nil {
-		return err
-	}
 
 	return nil
 }

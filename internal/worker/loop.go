@@ -16,9 +16,7 @@ import (
 )
 
 var (
-	ErrLoopClosed = fmt.Errorf("loop closed")
-	ErrTimeout    = fmt.Errorf("timeout")
-	loopLogger    = logger.NewLogger("Loop")
+	loopLogger = logger.NewLogger("Loop")
 )
 
 type Loop interface {

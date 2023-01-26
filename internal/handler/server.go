@@ -104,7 +104,7 @@ func ServerStart(ctx context.Context, opts *ServerOpts) error {
 
 	switch opts.Mode {
 	case CommonFlagConnect:
-		return Connect(ctx, opts.Endpoint, handler)
+		return Connect(ctx, opts.Endpoint, handler, opts.ConnDelayIfConnect)
 
 	case CommonFlagListen:
 		return Listen(ctx, opts.Endpoint, handler, opts.MaxConnIfListen)
