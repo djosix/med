@@ -7,11 +7,16 @@ const (
 	ProcKind_Example  ProcKind = "Example"
 	ProcKind_Main     ProcKind = "Main"
 	ProcKind_Exec     ProcKind = "Exec"
-	ProcKind_Term     ProcKind = "Term"
 	ProcKind_LocalPF  ProcKind = "LocalPF"
 	ProcKind_RemotePF ProcKind = "RemotePF"
-	ProcKind_Upload   ProcKind = "Upload"
-	ProcKind_Download ProcKind = "Download"
+	ProcKind_Get      ProcKind = "Get"
+	ProcKind_Put      ProcKind = "Put"
+	ProcKind_Socks5   ProcKind = "Socks5"
+	ProcKind_Proxy    ProcKind = "Proxy"
+	ProcKind_Self     ProcKind = "Self"
+	ProcKind_WebUI    ProcKind = "WebUI"
+	ProcKind_CLI      ProcKind = "CLI"
+	ProcKind_TMUX     ProcKind = "TMUX"
 )
 
 type ProcSide byte

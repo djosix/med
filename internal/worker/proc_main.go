@@ -1,7 +1,6 @@
 package worker
 
 import (
-	"bufio"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -39,18 +38,25 @@ type MainProcMsg_Remove struct {
 // Client
 
 type MainSpec struct {
-	IsTTY bool
+	ExitWhenNoProc bool
+}
+
+type mainAnyProcKindAndSpec struct {
+	kind ProcKind
+	spec any
 }
 
 type MainProcClient struct {
 	ProcInfo
 	MainSpec
+	newProcCh chan mainAnyProcKindAndSpec
 }
 
 func NewMainProcClient(spec MainSpec) *MainProcClient {
 	return &MainProcClient{
-		ProcInfo: NewProcInfo(ProcKind_Main, ProcSide_Client),
-		MainSpec: spec,
+		ProcInfo:  NewProcInfo(ProcKind_Main, ProcSide_Client),
+		MainSpec:  spec,
+		newProcCh: make(chan mainAnyProcKindAndSpec),
 	}
 }
 
@@ -59,13 +65,15 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 	logger.Debug("start")
 	defer logger.Debug("done")
 
+	SendProcSpec(ctx, p.MainSpec)
+
 	var seqNo uint32 = 0
 
-	type procStartInfo struct {
+	type pendingProc struct {
 		procID uint32
-		handle func(bool)
+		handle func(bool) <-chan struct{}
 	}
-	startProcBySeqNo := map[uint32]procStartInfo{}
+	pendingProcs := map[uint32]pendingProc{}
 
 	startProc := func(procKind ProcKind, spec any) {
 		proc, err := CreateProcClient(procKind, spec)
@@ -74,62 +82,63 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 			return
 		}
 
+		// Start client proc after server proc is created
 		procID, handle := ctx.Loop.StartLater(proc)
-
 		seqNo := atomic.AddUint32(&seqNo, 1)
-		ctx.PktOutCh <- &pb.Packet{
-			Kind: pb.PacketKind_PacketKindData,
-			Data: helper.MustEncode(&MainProcMsg{
-				Kind:  MainProcMsgKind_Start,
-				SeqNo: seqNo,
-				Data: helper.MustEncode(&MainProcMsg_Start{
-					ProcKind: procKind,
-					ProcID:   procID,
-				}),
-			}),
-		}
-		startProcBySeqNo[seqNo] = procStartInfo{procID: procID, handle: handle}
+		pendingProcs[seqNo] = pendingProc{procID: procID, handle: handle}
+
+		// Notify server to create a proc
+		ctx.PktOutCh <- helper.NewDataPacket(helper.MustEncode(&MainProcMsg{
+			Kind: MainProcMsgKind_Start, SeqNo: seqNo,
+			Data: helper.MustEncode(&MainProcMsg_Start{ProcKind: procKind, ProcID: procID}),
+		}))
+
+		// go func() {
+		// 	time.Sleep(10 * time.Second)
+		// 	delete(pendingProcs, seqNo)
+		// }()
 	}
-	_ = startProc
 
 	removeProc := func(procID uint32) {
 		seqNo := atomic.AddUint32(&seqNo, 1)
-		ctx.PktOutCh <- &pb.Packet{
-			Kind: pb.PacketKind_PacketKindData,
-			Data: helper.MustEncode(&MainProcMsg{
-				Kind:  MainProcMsgKind_Remove,
-				SeqNo: seqNo,
-				Data:  helper.MustEncode(&MainProcMsg_Remove{ProcID: procID}),
-			}),
-		}
+		ctx.PktOutCh <- helper.NewDataPacket(helper.MustEncode(&MainProcMsg{
+			Kind: MainProcMsgKind_Remove, SeqNo: seqNo,
+			Data: helper.MustEncode(&MainProcMsg_Remove{ProcID: procID}),
+		}))
 	}
 	_ = removeProc
 
 	handleMessage := func(msg *MainProcMsg) {
 		switch msg.Kind {
 		case MainProcMsgKind_Start:
+			// Handle server proc created
 			data, err := helper.DecodeAs[MainProcMsg_Start](msg.Data)
 			if err != nil {
 				logger.Error("decode start error:", err)
 				return
 			}
 
-			p, exists := startProcBySeqNo[msg.SeqNo]
+			pp, exists := pendingProcs[msg.SeqNo]
 			if !exists {
 				logger.Error("no proc to start")
 				return
 			}
-			delete(startProcBySeqNo, msg.SeqNo)
+			delete(pendingProcs, msg.SeqNo)
 
 			if data.Error != "" {
-				logger.Errorf("start proc[%v]: %v", p.procID, data.Error)
-				p.handle(false) // cancel start
+				logger.Errorf("start proc[%v]: %v", pp.procID, data.Error)
+				pp.handle(false) // cancel start
 			} else {
-				logger.Debugf("start proc[%v]", p.procID)
-				p.handle(true)
+				logger.Debugf("start proc[%v]", pp.procID)
+				doneCh := pp.handle(true)
+
+				if p.ExitWhenNoProc {
+					go func() { <-doneCh; ctx.Cancel() }()
+				}
 			}
 
 		case MainProcMsgKind_Remove:
+			// Handle server proc removed
 			data, err := helper.DecodeAs[MainProcMsg_Remove](msg.Data)
 			if err != nil {
 				logger.Error("decode remove:", err)
@@ -144,26 +153,21 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 
 	wg := sync.WaitGroup{}
 
+	// Handle p.StartProc calls
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
-		// TODO: implement prompt
-		reader, cancel, _ := helper.GetCancelStdin()
-		defer cancel()
-
-		line, _, err := bufio.NewReader(reader).ReadLine()
-		if err != nil {
-			return
+		for {
+			select {
+			case ks := <-p.newProcCh:
+				startProc(ks.kind, ks.spec)
+			case <-ctx.Done():
+				return
+			}
 		}
-		logger.Debug("line:", line)
-
-		startProc(ProcKind_Exec, ExecSpec{
-			ARGV: []string{"bash", "-c", string(line)},
-			TTY:  true,
-		})
 	}()
 
+	// Main loop
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -185,7 +189,7 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 			case pb.PacketKind_PacketKindData:
 				msg, err := helper.DecodeAs[MainProcMsg](pkt.Data)
 				if err != nil {
-					logger.Error("decode as msg:", err)
+					logger.Error("decode as MainProcMsg:", err)
 					continue forLoop
 				}
 				handleMessage(&msg)
@@ -196,6 +200,12 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 	}()
 
 	wg.Wait()
+}
+
+func (p *MainProcClient) StartProc(kind ProcKind, spec any) {
+	go func() {
+		p.newProcCh <- mainAnyProcKindAndSpec{kind: kind, spec: spec}
+	}()
 }
 
 // Server
@@ -215,6 +225,12 @@ func (p *MainProcServer) Run(ctx *ProcRunCtx) {
 	logger.Debug("start")
 	defer logger.Debug("done")
 
+	spec, err := RecvProcSpec[MainSpec](ctx)
+	if err != nil {
+		logger.Error("cannot decode MainSpec:", err)
+		return
+	}
+
 	handleStart := func(data *MainProcMsg_Start) error {
 		// Create proc by kind
 		proc, err := CreateProcServer(data.ProcKind)
@@ -230,7 +246,11 @@ func (p *MainProcServer) Run(ctx *ProcRunCtx) {
 		}
 
 		logger.Debugf("start proc[%v] kind=%v", startProcID, data.ProcKind)
-		startHandle(true)
+		doneCh := startHandle(true)
+
+		if spec.ExitWhenNoProc {
+			go func() { <-doneCh; ctx.Cancel() }()
+		}
 
 		return nil
 	}

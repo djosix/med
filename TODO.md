@@ -39,3 +39,4 @@ TODO
 - relay: connect two clients or two servers
     - med relay -c endpoint1 -c endpoint2
     - med relay -l endpoint1 [-l endpoint2]
+- if dispatcher get error, close the proc

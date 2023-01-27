@@ -20,12 +20,12 @@ var (
 )
 
 type Loop interface {
-	Run()                                                 // Run the loop
-	Start(h Proc) uint32                                  // Start a Proc
-	StartLater(p Proc) (procID uint32, handle func(bool)) // Start a Proc later
-	Remove(id uint32) bool                                // Remove a Proc
-	Done() <-chan struct{}                                // Get the done chan of loop ctx
-	Stop()                                                // Stop the loop
+	Run()                                                                 // Run the loop
+	Start(h Proc) (procID uint32, doneCh <-chan struct{})                 // Start a Proc
+	StartLater(p Proc) (procID uint32, handle func(bool) <-chan struct{}) // Start a Proc later
+	Remove(id uint32) bool                                                // Remove a Proc
+	Done() <-chan struct{}                                                // Get the done chan of loop ctx
+	Stop()                                                                // Stop the loop
 }
 
 type LoopImpl struct {
@@ -109,13 +109,12 @@ func (loop *LoopImpl) Run() {
 	}
 }
 
-func (loop *LoopImpl) Start(p Proc) (procID uint32) {
+func (loop *LoopImpl) Start(p Proc) (procID uint32, doneCh <-chan struct{}) {
 	procID, handle := loop.StartLater(p)
-	handle(true)
-	return procID
+	return procID, handle(true)
 }
 
-func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool)) {
+func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool) <-chan struct{}) {
 	if p == nil {
 		panic("p is nil")
 	}
@@ -197,18 +196,23 @@ func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool)) {
 		p.Run(&runCtx)
 	}
 
-	handle = func(ok bool) {
+	handle = func(ok bool) <-chan struct{} {
 		if !ok {
 			logger.Debugf("cancel handle for proc[%v]", procID)
 			loop.Remove(procID)
-			return
+			return nil
 		}
+
+		doneCh := make(chan struct{})
 
 		loop.wg.Add(1)
 		go func() {
 			defer loop.wg.Done()
+			defer close(doneCh)
 			start()
 		}()
+
+		return doneCh
 	}
 
 	return procID, handle
@@ -224,9 +228,16 @@ func (loop *LoopImpl) Remove(procID uint32) bool {
 	if ok {
 		loopLogger.Debugf("cleanup proc[%v]", procID)
 
-		close(p.pktInCh)
 		p.cancel()
+		close(p.pktInCh)
 		delete(loop.procData, procID)
+
+		// Close remote proc
+		select {
+		case loop.pktOutCh <- pb.NewCtrlPacket(procID, pb.PacketCtrl_Exit):
+		case <-loop.ctx.Done():
+			return ok
+		}
 	}
 
 	// Shutdown loop if no proc exists
@@ -317,18 +328,28 @@ func (loop *LoopImpl) dispatcher() {
 	}
 
 	for pkt := range loop.pktInCh {
-		if err := dispatchToProc(pkt); err != nil {
+		// Handle exit packet from remote loop
+		if pkt.SourceID == 0 && pb.IsPacketWithCtrlKind(pkt, pb.PacketCtrl_Exit) {
+			if pkt.TargetID == 0 {
+				loop.Stop()
+				continue
+			}
+			loop.Remove(pkt.TargetID)
+			continue
+		}
+
+		err := dispatchToProc(pkt)
+		if err != nil {
 			logger.Debugf("dispatch error for [%v]: %v", pkt, err)
 
-			pkt := &pb.Packet{
+			errPkt := &pb.Packet{
 				TargetID: pkt.SourceID,
 				SourceID: pkt.TargetID,
 				Kind:     pb.PacketKind_PacketKindError,
 				Data:     []byte(err.Error()),
 			}
-
 			select {
-			case loop.pktOutCh <- pkt:
+			case loop.pktOutCh <- errPkt:
 			case <-loop.ctx.Done():
 				return
 			}

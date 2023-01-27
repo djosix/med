@@ -7,10 +7,8 @@ import (
 	"os"
 
 	"github.com/djosix/med/internal"
-	"github.com/djosix/med/internal/helper"
 	"github.com/djosix/med/internal/initializer"
 	"github.com/djosix/med/internal/logger"
-	"github.com/djosix/med/internal/readwriter"
 	"github.com/djosix/med/internal/worker"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
@@ -115,30 +113,25 @@ func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
 		panic("cannot get opts from ctx")
 	}
 
-	rootProc, err := DetermineProc(opts.Args, opts.IsTTY)
+	procKind, procSpec, err := DetermineProc(opts.Args, opts.IsTTY)
 	if err != nil {
 		return err
 	}
 
-	// Send root proc kind to server
-	{
-		frameRw := readwriter.NewPlainFrameReadWriter(rw)
-		frame := helper.MustEncode(rootProc.Kind())
-		if err := frameRw.WriteFrame(frame); err != nil {
-			return fmt.Errorf("cannot write root proc kind: %w", err)
-		}
-	}
+	mainProc := worker.NewMainProcClient(worker.MainSpec{
+		ExitWhenNoProc: true,
+	})
+	mainProc.StartProc(procKind, procSpec)
 
 	loop := worker.NewLoop(ctx, rw)
-	loop.Start(rootProc)
+	loop.Start(mainProc)
 	loop.Run()
 
 	return nil
 }
 
-func DetermineProc(args []string, tty bool) (worker.Proc, error) {
+func DetermineProc(args []string, tty bool) (kind worker.ProcKind, spec any, err error) {
 	defaultArgv := []string{"/bin/sh"}
-
 	if len(args) == 0 {
 		args = append([]string{"exec"}, defaultArgv...)
 	}
@@ -149,17 +142,16 @@ func DetermineProc(args []string, tty bool) (worker.Proc, error) {
 		if len(spec.ARGV) == 0 {
 			spec.ARGV = defaultArgv
 		}
-		return worker.NewExecProcClient(spec), nil
+		return worker.ProcKind_Exec, spec, nil
 	case "get":
 	case "put":
 	case "forward":
+	case "socks5":
 	case "proxy":
 	case "self":
 	case "webui":
 	case "tmux":
-	case "cli":
-		return worker.NewMainProcClient(worker.MainSpec{IsTTY: tty}), nil
 	}
 
-	return nil, fmt.Errorf("cannot determine root proc")
+	return worker.ProcKind_None, nil, fmt.Errorf("cannot determine root proc")
 }

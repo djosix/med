@@ -28,7 +28,7 @@ func NewExampleProcClient(spec ExampleSpec) *ExampleProcClient {
 func (p *ExampleProcClient) Run(ctx *ProcRunCtx) {
 	// Send spec
 	SendProcSpec(ctx, p.spec)
-	ctx.PktOutCh <- helper.NewDataPkt([]byte(fmt.Sprintf("Hello %s from client", p.spec.Name)))
+	ctx.PktOutCh <- helper.NewDataPacket([]byte(fmt.Sprintf("Hello %s from client", p.spec.Name)))
 	logger.Info(string((<-ctx.PktInCh).Data))
 }
 
@@ -55,6 +55,6 @@ func (p *ExampleProcServer) Run(ctx *ProcRunCtx) {
 	}
 	logger.Debug("spec =", spec)
 
-	ctx.PktOutCh <- helper.NewDataPkt([]byte(fmt.Sprintf("Hello %s from server", spec.Name)))
+	ctx.PktOutCh <- helper.NewDataPacket([]byte(fmt.Sprintf("Hello %s from server", spec.Name)))
 	logger.Info(string((<-ctx.PktInCh).Data))
 }

@@ -2,14 +2,11 @@ package handler
 
 import (
 	"context"
-	"fmt"
 	"io"
 
 	"github.com/djosix/med/internal"
-	"github.com/djosix/med/internal/helper"
 	"github.com/djosix/med/internal/initializer"
 	"github.com/djosix/med/internal/logger"
-	"github.com/djosix/med/internal/readwriter"
 	"github.com/djosix/med/internal/worker"
 
 	"github.com/spf13/cobra"
@@ -98,30 +95,8 @@ func ServerHandler(ctx context.Context, rw io.ReadWriter) error {
 	logger.Debug("start")
 	defer logger.Debug("done")
 
-	var rootProcKind worker.ProcKind
-	{
-		frame, err := readwriter.NewPlainFrameReadWriter(rw).ReadFrame()
-		if err != nil {
-			return fmt.Errorf("cannot read root proc kind: %w", err)
-		}
-		kind, err := helper.DecodeAs[worker.ProcKind](frame)
-		if err != nil {
-			return fmt.Errorf("cannot decode root proc kind: %w", err)
-		}
-		rootProcKind = kind
-	}
-
-	var rootProc worker.Proc
-	{
-		proc, err := worker.CreateProcServer(rootProcKind)
-		if err != nil {
-			return err
-		}
-		rootProc = proc
-	}
-
 	loop := worker.NewLoop(ctx, rw)
-	loop.Start(rootProc)
+	loop.Start(worker.NewMainProcServer())
 	loop.Run()
 
 	return nil

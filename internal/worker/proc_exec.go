@@ -152,11 +152,10 @@ func (p *ExecProcClient) Run(ctx *ProcRunCtx) {
 
 			switch pkt.Kind {
 			case pb.PacketKind_PacketKindCtrl:
-				switch string(pkt.Data) {
-				case pb.PacketDataCtrl_Exit:
-					logger.Debug("PacketDataCtrl_Exit")
+				if pb.IsPacketWithCtrlKind(pkt, pb.PacketCtrl_Exit) {
+					logger.Debug("PacketCtrl_Exit")
 					return
-				default:
+				} else {
 					logger.Warn("unknown pkt.Data for PacketKind_PacketKindCtrl:", pkt.Data)
 				}
 			case pb.PacketKind_PacketKindData:
@@ -419,14 +418,10 @@ func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
 		}
 	}()
 
-	logger.Debug("wg.Wait")
+	logger.Debug("wait")
 	wg.Wait()
-	logger.Debug("wg.Wait done")
+	logger.Debug("wait done")
 
-	ctx.PktOutCh <- &pb.Packet{
-		Kind: pb.PacketKind_PacketKindCtrl,
-		Data: []byte(pb.PacketDataCtrl_Exit),
-	}
-
+	ctx.PktOutCh <- pb.NewCtrlPacket(ctx.ProcID, pb.PacketCtrl_Exit)
 	ctx.Cancel()
 }
