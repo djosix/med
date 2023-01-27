@@ -203,7 +203,7 @@ func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool) <-cha
 			return nil
 		}
 
-		doneCh := make(chan struct{})
+		doneCh := make(chan struct{}, 0)
 
 		loop.wg.Add(1)
 		go func() {
