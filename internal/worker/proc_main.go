@@ -127,7 +127,7 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 			delete(pendingProcs, msg.SeqNo)
 
 			if data.Error != "" {
-				logger.Errorf("start proc[%v]: %v", pp.procID, data.Error)
+				logger.Errorf("start proc[%v] remote: %v", pp.procID, data.Error)
 				pp.handle(false) // cancel start
 			} else {
 				logger.Debugf("start proc[%v]", pp.procID)

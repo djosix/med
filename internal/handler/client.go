@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -57,7 +58,8 @@ func GetClientOpts(cmd *cobra.Command, args []string) (*ClientOpts, error) {
 
 func ClientMain(cmd *cobra.Command, args []string) {
 	logger := logger.NewLogger("ClientMain")
-	defer logger.Debug("Done")
+	logger.Debug("start")
+	defer logger.Debug("done")
 
 	opts, err := GetClientOpts(cmd, args)
 	if err != nil {
@@ -134,15 +136,22 @@ func DetermineProc(args []string, tty bool) (kind worker.ProcKind, spec any, err
 		args = append([]string{"exec"}, defaultArgv...)
 	}
 
-	switch args[0] {
+	action := args[0]
+	args = args[1:]
+
+	switch action {
 	case "exec":
-		spec := worker.ExecSpec{TTY: tty, ARGV: args[1:]}
+		spec := worker.ExecSpec{TTY: tty, ARGV: args}
 		if len(spec.ARGV) == 0 {
 			spec.ARGV = defaultArgv
 		}
 		return worker.ProcKind_Exec, spec, nil
 	case "get":
+		spec := parseGetPutArgs(args)
+		return worker.ProcKind_Get, spec, nil
 	case "put":
+		spec := parseGetPutArgs(args)
+		return worker.ProcKind_Put, spec, nil
 	case "forward":
 	case "socks5":
 	case "proxy":
@@ -152,4 +161,16 @@ func DetermineProc(args []string, tty bool) (kind worker.ProcKind, spec any, err
 	}
 
 	return worker.ProcKind_None, nil, fmt.Errorf("cannot determine root proc")
+}
+
+func parseGetPutArgs(args []string) worker.GetPutSpec {
+	spec := worker.GetPutSpec{}
+	flags := flag.NewFlagSet("get", flag.ContinueOnError)
+	flags.BoolVar(&spec.IsGzipMode, "z", false, "enable gzip compression")
+	flags.BoolVar(&spec.IsTarMode, "t", false, "enable tar mode")
+	flags.StringVar(&spec.DestPath, "d", "", "destination")
+	flags.Parse(args)
+	spec.SourcePaths = flags.Args()
+	logger.Debugf("parseGetPutArgs: spec = %#v", spec)
+	return spec
 }

@@ -17,6 +17,8 @@ import (
 
 var (
 	loopLogger = logger.NewLogger("Loop")
+
+	ErrLoopClosed = fmt.Errorf("loop closed")
 )
 
 type Loop interface {
@@ -32,7 +34,11 @@ type LoopImpl struct {
 	lastProcID uint32
 	procData   map[uint32]loopProcInfo
 	procLock   sync.Mutex
-	runLock    sync.Mutex
+	procCtx    context.Context
+	procCancel context.CancelFunc
+	procWg     sync.WaitGroup
+
+	runLock sync.Mutex
 
 	pktInCh         chan *pb.Packet
 	pktOutCh        chan *pb.Packet
@@ -58,23 +64,25 @@ func NewLoop(ctx context.Context, rw io.ReadWriter) *LoopImpl {
 	frameRw = readwriter.NewSnappyFrameReadWriter(frameRw) // compress frames
 
 	var cancel context.CancelFunc
-	ctx, cancel = context.WithCancel(ctx)
+	loopCtx, loopCancel := context.WithCancel(ctx)
+	procCtx, procCancel := context.WithCancel(ctx)
 
 	return &LoopImpl{
 		lastProcID: 0,
 		procData:   map[uint32]loopProcInfo{},
 		procLock:   sync.Mutex{},
-		runLock:    sync.Mutex{},
+		procCtx:    procCtx,
+		procCancel: procCancel,
+
+		runLock: sync.Mutex{},
 
 		pktInCh:         make(chan *pb.Packet, 0),
 		pktOutCh:        make(chan *pb.Packet, 0),
 		frameRw:         frameRw,
 		dispatchTimeout: time.Duration(1) * time.Second,
 
-		wg:       sync.WaitGroup{},
-		ctx:      ctx,
-		cancel:   cancel,
-		stopOnce: sync.Once{},
+		ctx:    loopCtx,
+		cancel: loopCancel,
 	}
 }
 
@@ -154,8 +162,8 @@ func (loop *LoopImpl) StartLater(p Proc) (procID uint32, handle func(bool) <-cha
 		for {
 			pkt := <-pktOutCh
 			if pkt == nil {
-				logger.Debug("output packet is nil")
-				return // closed
+				logger.Debug("packet output channel closed")
+				return
 			}
 
 			// logger.Debugf("packet: [%v]", pkt)
@@ -224,20 +232,22 @@ func (loop *LoopImpl) Remove(procID uint32) bool {
 
 	loopLogger.Debugf("remove proc[%v]", procID)
 
-	p, ok := loop.procData[procID]
+	pd, ok := loop.procData[procID]
 	if ok {
 		loopLogger.Debugf("cleanup proc[%v]", procID)
 
-		p.cancel()
-		close(p.pktInCh)
+		pd.cancel()
+		close(pd.pktInCh)
 		delete(loop.procData, procID)
 
 		// Close remote proc
-		select {
-		case loop.pktOutCh <- pb.NewCtrlPacket(procID, pb.PacketCtrl_Exit):
-		case <-loop.ctx.Done():
-			return ok
-		}
+		go func() {
+			select {
+			case loop.pktOutCh <- pb.NewCtrlPacket(procID, pb.PacketCtrl_Exit):
+			case <-loop.ctx.Done():
+				return
+			}
+		}()
 	}
 
 	// Shutdown loop if no proc exists
@@ -258,8 +268,11 @@ func (loop *LoopImpl) Stop() {
 		loop.procLock.Lock()
 		defer loop.procLock.Unlock()
 
-		loopLogger.Debug("cancel()")
 		loop.cancel()
+
+		for procID := range loop.procData {
+			go loop.Remove(procID)
+		}
 
 		if conn, ok := loop.ctx.Value("conn").(net.Conn); ok {
 			loopLogger.Debug("BreakIO")
@@ -287,11 +300,6 @@ func (loop *LoopImpl) reader() {
 			logger.Warn("Unmarshal(frame, pb.Packet):", err)
 			continue
 		}
-		if pkt.Kind == pb.PacketKind_PacketKindError {
-			logger.Errorf("found error [%v]", pkt.String())
-			loop.Remove(pkt.TargetID)
-			continue
-		}
 
 		select {
 		case loop.pktInCh <- &pkt:
@@ -312,15 +320,17 @@ func (loop *LoopImpl) dispatcher() {
 		defer loop.procLock.Unlock()
 
 		// logger.Debugf("packet: [%v]", pkt)
-		p, ok := loop.procData[pkt.TargetID]
+		pd, ok := loop.procData[pkt.TargetID]
 		if !ok {
 			return fmt.Errorf("proc[%v] not found", pkt.TargetID)
 		}
 
 		select {
-		case p.pktInCh <- pkt:
+		case pd.pktInCh <- pkt:
+		case <-pd.ctx.Done():
+			return nil
 		case <-loop.Done():
-			return fmt.Errorf("loop closed")
+			return ErrLoopClosed
 		case <-time.NewTimer(loop.dispatchTimeout).C:
 			return fmt.Errorf("dispatch timeout")
 		}
@@ -330,11 +340,22 @@ func (loop *LoopImpl) dispatcher() {
 	for pkt := range loop.pktInCh {
 		// Handle exit packet from remote loop
 		if pkt.SourceID == 0 && pb.IsPacketWithCtrlKind(pkt, pb.PacketCtrl_Exit) {
+			logger.Debug("exit packet:", pkt)
 			if pkt.TargetID == 0 {
 				loop.Stop()
 				continue
 			}
 			loop.Remove(pkt.TargetID)
+			continue
+		}
+
+		// Handle error packet
+		if pkt.Kind == pb.PacketKind_PacketKindError {
+			logger.Errorf("remote proc[%v] error: %v", pkt.SourceID, string(pkt.Data))
+			logger.Debug("remote error packet [%v]", pkt.String())
+			if pkt.SourceID == 0 || pkt.SourceID == pkt.TargetID {
+				loop.Remove(pkt.TargetID)
+			}
 			continue
 		}
 

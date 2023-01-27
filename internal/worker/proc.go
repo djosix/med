@@ -32,14 +32,20 @@ func CreateProcClient(kind ProcKind, spec any) (Proc, error) {
 		if spec, ok := spec.(ExampleSpec); ok {
 			proc = NewExampleProcClient(spec)
 		}
-
 	case ProcKind_Exec:
 		if spec, ok := spec.(ExecSpec); ok {
 			proc = NewExecProcClient(spec)
 		}
-
+	case ProcKind_Get:
+		if spec, ok := spec.(GetPutSpec); ok {
+			proc = NewGetProcClient(spec)
+		}
+	case ProcKind_Put:
+		if spec, ok := spec.(GetPutSpec); ok {
+			proc = NewPutProcClient(spec)
+		}
 	default:
-		return nil, fmt.Errorf("proc kind=[%v] not registered", kind)
+		return nil, fmt.Errorf("proc kind=%v not registered", kind)
 	}
 
 	if proc == nil {
@@ -59,13 +65,12 @@ func CreateProcServer(kind ProcKind) (Proc, error) {
 	switch kind {
 	case ProcKind_Example:
 		proc = NewExampleProcServer()
-
 	case ProcKind_Exec:
 		proc = NewExecProcServer()
-
-	case ProcKind_Main:
-		proc = NewMainProcServer()
-
+	case ProcKind_Get:
+		proc = NewGetProcServer()
+	case ProcKind_Put:
+		proc = NewPutProcServer()
 	default:
 		return nil, fmt.Errorf("proc kind=[%v] not registered", kind)
 	}

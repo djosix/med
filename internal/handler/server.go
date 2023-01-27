@@ -46,7 +46,8 @@ func GetServerOpts(cmd *cobra.Command, args []string) (*ServerOpts, error) {
 
 func ServerMain(cmd *cobra.Command, args []string) {
 	logger := logger.NewLogger("ServerMain")
-	defer logger.Debug("Done")
+	logger.Debug("start")
+	defer logger.Debug("done")
 
 	opts, err := GetServerOpts(cmd, args)
 	if err != nil {
