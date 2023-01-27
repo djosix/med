@@ -118,9 +118,7 @@ func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
 		return err
 	}
 
-	mainProc := worker.NewMainProcClient(worker.MainSpec{
-		ExitWhenNoProc: true,
-	})
+	mainProc := worker.NewMainProcClient(worker.MainSpec{ExitWhenNoProc: true})
 	mainProc.StartProc(procKind, procSpec)
 
 	loop := worker.NewLoop(ctx, rw)

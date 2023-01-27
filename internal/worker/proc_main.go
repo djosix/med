@@ -68,6 +68,7 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 	SendProcSpec(ctx, p.MainSpec)
 
 	var seqNo uint32 = 0
+	var procCount int32 = 0
 
 	type pendingProc struct {
 		procID uint32
@@ -132,9 +133,13 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 				logger.Debugf("start proc[%v]", pp.procID)
 				doneCh := pp.handle(true)
 
-				if p.ExitWhenNoProc {
-					go func() { <-doneCh; ctx.Cancel() }()
-				}
+				atomic.AddInt32(&procCount, 1)
+				go func() {
+					<-doneCh
+					if atomic.AddInt32(&procCount, -1) == 0 && p.ExitWhenNoProc {
+						ctx.Cancel()
+					}
+				}()
 			}
 
 		case MainProcMsgKind_Remove:
@@ -231,6 +236,8 @@ func (p *MainProcServer) Run(ctx *ProcRunCtx) {
 		return
 	}
 
+	var procCount int32 = 0
+
 	handleStart := func(data *MainProcMsg_Start) error {
 		// Create proc by kind
 		proc, err := CreateProcServer(data.ProcKind)
@@ -248,9 +255,14 @@ func (p *MainProcServer) Run(ctx *ProcRunCtx) {
 		logger.Debugf("start proc[%v] kind=%v", startProcID, data.ProcKind)
 		doneCh := startHandle(true)
 
-		if spec.ExitWhenNoProc {
-			go func() { <-doneCh; ctx.Cancel() }()
-		}
+		// Subscribe proc exit
+		atomic.AddInt32(&procCount, 1)
+		go func() {
+			<-doneCh
+			if atomic.AddInt32(&procCount, -1) == 0 && spec.ExitWhenNoProc {
+				ctx.Cancel()
+			}
+		}()
 
 		return nil
 	}
