@@ -13,7 +13,7 @@ import (
 )
 
 func InitEncryption(secret []byte) Initializer {
-	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
+	return func(ctx context.Context, rwc io.ReadWriteCloser) (ctxOut context.Context, rwcOut io.ReadWriteCloser, err error) {
 		initLogger.Debug("Encryption")
 
 		secret := secret
@@ -27,7 +27,9 @@ func InitEncryption(secret []byte) Initializer {
 		}
 
 		ctxOut = ctx
-		rwOut, err = NewEncryptionLayer(rw, secret)
+		rw, err := NewEncryptionLayer(rwc, secret)
+		rwcOut = helper.NewReadWriterCloser(rw, rw, rwc)
+
 		return
 	}
 }

@@ -105,7 +105,7 @@ func ClientStart(ctx context.Context, opts *ClientOpts) error {
 	}
 }
 
-func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
+func ClientHandler(ctx context.Context, rwc io.ReadWriteCloser) error {
 	logger := logger.NewLogger("ClientHandler")
 	logger.Debug("start")
 	defer logger.Debug("done")
@@ -123,7 +123,7 @@ func ClientHandler(ctx context.Context, rw io.ReadWriter) error {
 	mainProc := worker.NewMainProcClient(worker.MainSpec{ExitWhenNoProc: true})
 	mainProc.StartProc(procKind, procSpec)
 
-	loop := worker.NewLoop(ctx, rw)
+	loop := worker.NewLoop(ctx, rwc)
 	loop.Start(mainProc)
 	loop.Run()
 

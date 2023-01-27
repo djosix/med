@@ -91,12 +91,12 @@ func ServerStart(ctx context.Context, opts *ServerOpts) error {
 	}
 }
 
-func ServerHandler(ctx context.Context, rw io.ReadWriter) error {
+func ServerHandler(ctx context.Context, rwc io.ReadWriteCloser) error {
 	logger := logger.NewLogger("ServerHandler")
 	logger.Debug("start")
 	defer logger.Debug("done")
 
-	loop := worker.NewLoop(ctx, rw)
+	loop := worker.NewLoop(ctx, rwc)
 	loop.Start(worker.NewMainProcServer())
 	loop.Run()
 

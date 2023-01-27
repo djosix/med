@@ -12,24 +12,24 @@ import (
 )
 
 func InitVerify(hash []byte) Initializer {
-	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
+	return func(ctx context.Context, rwc io.ReadWriteCloser) (ctxOut context.Context, rwcOut io.ReadWriteCloser, err error) {
 		initLogger.Debug("Verify")
 
 		ctxOut = ctx
-		rwOut = rw
-		err = Verify(rw, hash)
+		rwcOut = rwc
+		err = Verify(rwc, hash)
 
 		return
 	}
 }
 
 func InitGetVerified(hash []byte) Initializer {
-	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
+	return func(ctx context.Context, rwc io.ReadWriteCloser) (ctxOut context.Context, rwcOut io.ReadWriteCloser, err error) {
 		initLogger.Debug("GetVerified")
 
 		ctxOut = ctx
-		rwOut = rw
-		err = GetVerified(rw, hash)
+		rwcOut = rwc
+		err = GetVerified(rwc, hash)
 
 		return
 	}

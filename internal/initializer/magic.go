@@ -10,12 +10,12 @@ import (
 )
 
 func InitCheckMagic(sendMagic, recvMagic []byte) Initializer {
-	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
+	return func(ctx context.Context, rwc io.ReadWriteCloser) (ctxOut context.Context, rwcOut io.ReadWriteCloser, err error) {
 		initLogger.Debug("CheckMagic")
 
 		ctxOut = ctx
-		rwOut = rw
-		err = CheckMagic(rw, sendMagic, recvMagic)
+		rwcOut = rwc
+		err = CheckMagic(rwc, sendMagic, recvMagic)
 
 		return
 	}

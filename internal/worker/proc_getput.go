@@ -53,10 +53,8 @@ func (p *GetProcClient) Run(ctx *ProcRunCtx) {
 	spec.DestPath = ""
 	SendProcSpec(ctx, p.spec)
 
-	err = recvFiles(ctx, destPaths)
-	if err != nil {
-		logger.Error("receive files:", err)
-		return
+	for err := range recvFiles(ctx, destPaths) {
+		logger.Error("error:", err)
 	}
 }
 
@@ -84,7 +82,17 @@ func (p *GetProcServer) Run(ctx *ProcRunCtx) {
 	}
 	logger.Debugf("spec: %#v", spec)
 
-	sendFiles(ctx, spec.SourcePaths)
+	for i, path := range spec.SourcePaths {
+		err := sendFile(ctx, i, path)
+		if err == ErrLoopClosed {
+			return
+		} else if err != nil {
+			logger.Debugf("send file [%v]: %v", path, err)
+		}
+		if !sendFileEnd(ctx, i, path, err) {
+			return
+		}
+	}
 }
 
 // Put Client
@@ -107,7 +115,18 @@ func (p *PutProcClient) Run(ctx *ProcRunCtx) {
 	defer logger.Debug("done")
 
 	SendProcSpec(ctx, p.spec)
-	sendFiles(ctx, p.spec.SourcePaths)
+
+	for i, path := range p.spec.SourcePaths {
+		err := sendFile(ctx, i, path)
+		if err == ErrLoopClosed {
+			return
+		} else if err != nil {
+			logger.Debugf("send file [%v]: %v", i, path, err)
+		}
+		if !sendFileEnd(ctx, i, path, err) {
+			return
+		}
+	}
 }
 
 // Put Server
@@ -141,10 +160,8 @@ func (p *PutProcServer) Run(ctx *ProcRunCtx) {
 		return
 	}
 
-	err = recvFiles(ctx, destPaths)
-	if err != nil {
-		logger.Error(err)
-		return
+	for err := range recvFiles(ctx, destPaths) {
+		logger.Error("error:", err)
 	}
 }
 
@@ -261,102 +278,105 @@ func sendFile(ctx *ProcRunCtx, idx int, path string) error {
 			return err
 		}
 
-		ctx.PktOutCh <- helper.NewDataPacket(data[:headerLen+n])
+		if !ctx.Output(helper.NewDataPacket(data[:headerLen+n])) {
+			return ErrLoopClosed
+		}
 	}
 }
 
-func sendFiles(ctx *ProcRunCtx, srcPaths []string) []error {
-	errs := make([]error, len(srcPaths))
-	for i, path := range srcPaths {
-		err := sendFile(ctx, i, path)
-		logger.Debugf("sendFile[%v][%v]: %v", i, path, err)
-		errs[i] = err
+func sendFileEnd(ctx *ProcRunCtx, idx int, path string, err error) bool {
+	data := []byte{1} // 1=end
+	data = binary.AppendUvarint(data, uint64(idx))
+	if err != nil {
+		data = append(data, []byte(err.Error())...)
 	}
-
-	for i, err := range errs {
-		data := []byte{1} // 1=end
-		data = binary.AppendUvarint(data, uint64(i))
-		if err != nil {
-			data = append(data, []byte(err.Error())...)
-		}
-		ctx.PktOutCh <- helper.NewDataPacket(data)
-	}
-
-	return errs
+	return ctx.Output(helper.NewDataPacket(data))
 }
 
-func recvFiles(ctx *ProcRunCtx, destPaths []string) error {
-	files := make([]*os.File, len(destPaths))
-	done := make([]bool, len(destPaths))
-	doneCount := 0
+func recvFiles(ctx *ProcRunCtx, destPaths []string) <-chan error {
+	ch := make(chan error)
 
-	for doneCount < len(destPaths) {
-		pkt, ok := <-ctx.PktInCh
-		if !ok {
-			return io.EOF
-		}
+	go func() {
+		defer close(ch)
 
-		r := bytes.NewReader(pkt.Data)
+		files := make([]*os.File, len(destPaths))
+		done := make([]bool, len(destPaths))
+		doneCount := 0
 
-		var end bool
-		{
-			b, err := r.ReadByte()
-			if err != nil {
-				return err
-			}
-			end = (b == 1)
-		}
-
-		var idx int
-		{
-			b, err := binary.ReadUvarint(r)
-			if err != nil {
-				return fmt.Errorf("cannot get file index")
-			}
-			if b > uint64(len(destPaths)) {
-				return fmt.Errorf("invalid file index")
-			}
-			idx = int(b)
-		}
-
-		if !end {
-			if done[idx] == true {
-				logger.Warn("receive data for a done file")
-				continue
+		for doneCount < len(destPaths) {
+			pkt, ok := <-ctx.PktInCh
+			if !ok {
+				ch <- io.EOF
+				return
 			}
 
-			if files[idx] == nil {
-				newf, err := os.OpenFile(destPaths[idx], os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+			r := bytes.NewReader(pkt.Data)
+
+			var end bool
+			{
+				b, err := r.ReadByte()
 				if err != nil {
-					return err
+					ch <- err
+					return
 				}
-				defer newf.Close()
-
-				files[idx] = newf
+				end = (b == 1)
 			}
 
-			r.WriteTo(files[idx])
-		} else {
-			if files[idx] != nil {
-				files[idx].Close()
-				files[idx] = nil
+			var idx int
+			{
+				b, err := binary.ReadUvarint(r)
+				if err != nil {
+					ch <- fmt.Errorf("cannot get file index")
+					return
+				}
+				if b > uint64(len(destPaths)) {
+					ch <- fmt.Errorf("invalid file index")
+					return
+				}
+				idx = int(b)
 			}
 
-			if !done[idx] {
-				done[idx] = true
-				doneCount++
+			if !end {
+				if done[idx] == true {
+					logger.Warn("receive data for a done file")
+					continue
+				}
+
+				if files[idx] == nil {
+					newf, err := os.OpenFile(destPaths[idx], os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+					if err != nil {
+						ch <- err
+						return
+					}
+					defer newf.Close()
+
+					files[idx] = newf
+				}
+
+				r.WriteTo(files[idx])
 			} else {
-				logger.Warn("receive end message twice")
-			}
+				if files[idx] != nil {
+					files[idx].Close()
+					files[idx] = nil
+				}
 
-			if r.Len() > 0 {
-				buf := bytes.NewBuffer(nil)
-				r.WriteTo(buf)
-				errMsg := string(buf.Bytes())
-				logger.Errorf("receive [%v] remote: %v", destPaths[idx], errMsg)
+				if !done[idx] {
+					done[idx] = true
+					doneCount++
+				} else {
+					logger.Warn("receive end message twice")
+				}
+
+				if r.Len() > 0 {
+					buf := bytes.NewBuffer(nil)
+					r.WriteTo(buf)
+					errMsg := string(buf.Bytes())
+
+					ch <- fmt.Errorf("receive [%v] remote: %v", destPaths[idx], errMsg)
+				}
 			}
 		}
-	}
+	}()
 
-	return nil
+	return ch
 }

@@ -22,6 +22,15 @@ type ProcRunCtx struct {
 	ProcID          uint32
 }
 
+func (p *ProcRunCtx) Output(pkt *pb.Packet) bool {
+	select {
+	case p.PktOutCh <- pkt:
+		return true
+	case <-p.Loop.Done():
+		return false
+	}
+}
+
 //
 
 func CreateProcClient(kind ProcKind, spec any) (Proc, error) {

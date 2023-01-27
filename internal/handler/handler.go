@@ -8,17 +8,17 @@ import (
 	"github.com/djosix/med/internal/logger"
 )
 
-type Handler = func(ctx context.Context, rw io.ReadWriter) error
+type Handler = func(ctx context.Context, rwc io.ReadWriteCloser) error
 
 func BindInitializers(h Handler, inits ...initializer.Initializer) Handler {
-	return func(ctx context.Context, rw io.ReadWriter) (err error) {
+	return func(ctx context.Context, rwc io.ReadWriteCloser) (err error) {
 		for _, init := range inits {
-			ctx, rw, err = init(ctx, rw)
+			ctx, rwc, err = init(ctx, rwc)
 			if err != nil {
 				return err
 			}
 		}
 		logger.Debug("Init: Done")
-		return h(ctx, rw)
+		return h(ctx, rwc)
 	}
 }

@@ -18,15 +18,15 @@ import (
 )
 
 func InitHandshake(privateKey ed25519.PrivateKey, trustedPublicKeys []ed25519.PublicKey) Initializer {
-	return func(ctx context.Context, rw io.ReadWriter) (ctxOut context.Context, rwOut io.ReadWriter, err error) {
+	return func(ctx context.Context, rwc io.ReadWriteCloser) (ctxOut context.Context, rwcOut io.ReadWriteCloser, err error) {
 		initLogger.Debug("Handshake")
 
-		sharedSecret, err := Handshake(rw, privateKey, trustedPublicKeys)
+		sharedSecret, err := Handshake(rwc, privateKey, trustedPublicKeys)
 		if err != nil {
 			return
 		}
 
-		rwOut = rw
+		rwcOut = rwc
 		ctxOut = context.WithValue(ctx, "secret", sharedSecret)
 
 		return
