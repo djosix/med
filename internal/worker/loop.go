@@ -107,13 +107,6 @@ func (loop *LoopImpl) Run() {
 		}()
 	}
 	loop.wg.Wait()
-
-	// if conn, ok := loop.ctx.Value("conn").(net.Conn); ok {
-	// 	logger.Debug("RefreshIO")
-	// 	helper.RefreshIO(conn)
-	// } else {
-	// 	panic("cannot find conn in ctx")
-	// }
 }
 
 func (loop *LoopImpl) Start(p Proc) (procID uint32, doneCh <-chan struct{}) {
@@ -271,13 +264,6 @@ func (loop *LoopImpl) Stop() {
 		for procID := range loop.procData {
 			go loop.Remove(procID) // avoid deadlock
 		}
-
-		// if conn, ok := loop.ctx.Value("conn").(net.Conn); ok {
-		// 	loopLogger.Debug("BreakIO")
-		// 	helper.BreakIO(conn)
-		// } else {
-		// 	panic("cannot find conn in ctx")
-		// }
 	})
 }
 
