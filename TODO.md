@@ -31,6 +31,11 @@ TODO
     - combined: med (client, keygen, server)
 - random keypair at build
     - generate keypairs using codegen?
+- user-specified magic
+- use protobuf instead of gob
 - history: for pentesters
     - save actions (procs & actions)
     - save raw tcp streams to .pcapng files
+- relay: connect two clients or two servers
+    - med relay -c endpoint1 -c endpoint2
+    - med relay -l endpoint1 [-l endpoint2]
