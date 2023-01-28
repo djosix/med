@@ -30,8 +30,15 @@ func (p *ExampleProcClient) Run(ctx *ProcRunCtx) {
 
 	// Send spec
 	SendProcSpec(ctx, p.spec)
-	ctx.PacketOutputCh <- helper.NewDataPacket([]byte(fmt.Sprintf("Hello %s from client", p.spec.Name)))
-	logger.Info(string((<-ctx.PacketInputCh).Data))
+
+	message := fmt.Sprintf("Hello %s from client", p.spec.Name)
+	ctx.OutputPacket(helper.NewDataPacket([]byte(message)))
+
+	if pkt := ctx.InputPacket(); pkt != nil {
+		logger.Info(string(pkt.Data))
+	} else {
+		logger.Error("input closed")
+	}
 }
 
 // Server
@@ -57,6 +64,12 @@ func (p *ExampleProcServer) Run(ctx *ProcRunCtx) {
 	}
 	logger.Debug("spec =", spec)
 
-	ctx.PacketOutputCh <- helper.NewDataPacket([]byte(fmt.Sprintf("Hello %s from server", spec.Name)))
-	logger.Info(string((<-ctx.PacketInputCh).Data))
+	message := fmt.Sprintf("Hello %s from server", spec.Name)
+	ctx.OutputPacket(helper.NewDataPacket([]byte(message)))
+
+	if pkt := ctx.InputPacket(); pkt != nil {
+		logger.Info(string(pkt.Data))
+	} else {
+		logger.Error("input closed")
+	}
 }
