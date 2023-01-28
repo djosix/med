@@ -20,12 +20,15 @@ var (
 )
 
 type Loop interface {
-	Run()                                                                 // Run the loop
-	Start(h Proc) (procID uint32, doneCh <-chan struct{})                 // Start a Proc
-	StartLater(p Proc) (procID uint32, handle func(bool) <-chan struct{}) // Start a Proc later
-	Remove(id uint32) bool                                                // Remove a Proc
-	Done() <-chan struct{}                                                // Get the done chan of loop ctx
-	Stop()                                                                // Stop the loop
+	Run()                                                 // Run the loop
+	Start(h Proc) (procID uint32, doneCh <-chan struct{}) // Start a Proc
+	StartLater(p Proc) (
+		procID uint32,
+		handle func(bool) (doneCh <-chan struct{},
+		)) // Start a Proc later
+	Remove(id uint32) bool // Remove a Proc
+	Done() <-chan struct{} // Get the done chan of loop ctx
+	Stop()                 // Stop the loop
 }
 
 type LoopImpl struct {
@@ -200,13 +203,13 @@ func (loop *LoopImpl) StartLater(proc Proc) (procID uint32, handle func(bool) <-
 		}()
 
 		runCtx := ProcRunCtx{
-			Context:        ctx,
-			Cancel:         cancel,
-			Loop:           loop,
-			PacketInputCh:  pktInCh,
-			PacketOutputCh: pktOutCh,
-			pktOutDone:     loop.writeDone,
-			ProcID:         procID,
+			Context:          ctx,
+			Cancel:           cancel,
+			Loop:             loop,
+			PacketInputCh:    pktInCh,
+			PacketOutputCh:   pktOutCh,
+			packetOutputDone: loop.writeDone,
+			ProcID:           procID,
 		}
 		proc.Run(&runCtx)
 
@@ -440,7 +443,6 @@ func (loop *LoopImpl) putPacketToChannelPassively(pkt *pb.Packet, ch chan<- *pb.
 	}
 }
 
-// drainPacketFromChannel returns nil if no packet can be get and the loop context is done
 func (loop *LoopImpl) drainPacketFromChannel(ch <-chan *pb.Packet) *pb.Packet {
 	return drainPacketFromChannel(loop.ctx, ch)
 }

@@ -14,20 +14,20 @@ type Proc interface {
 }
 
 type ProcRunCtx struct {
-	context.Context                    // proc ctx
-	Cancel          context.CancelFunc // cancel proc ctx
-	Loop            Loop               // the loop running proc
-	ProcID          uint32
-	PacketOutputCh  chan<- *pb.Packet // packet output channel
-	pktOutDone      <-chan struct{}
-	PacketInputCh   <-chan *pb.Packet // packet input channel
+	context.Context                     // proc ctx
+	Cancel           context.CancelFunc // cancel proc ctx
+	Loop             Loop               // the loop running proc
+	ProcID           uint32
+	PacketOutputCh   chan<- *pb.Packet // packet output channel
+	packetOutputDone <-chan struct{}
+	PacketInputCh    <-chan *pb.Packet // packet input channel
 }
 
 func (ctx *ProcRunCtx) OutputPacket(pkt *pb.Packet) bool {
 	select {
 	case ctx.PacketOutputCh <- pkt:
 		return true
-	case <-ctx.pktOutDone:
+	case <-ctx.packetOutputDone:
 		return false
 	}
 }
@@ -71,6 +71,10 @@ func CreateProcClient(kind ProcKind, spec any) (Proc, error) {
 		if spec, ok := spec.(SelfSpec); ok {
 			proc = NewSelfProcClient(spec)
 		}
+	case ProcKind_LocalPF:
+		if spec, ok := spec.(LocalPFSpec); ok {
+			proc = NewLocalPFProcClient(spec)
+		}
 	default:
 		return nil, fmt.Errorf("proc kind=%v not registered", kind)
 	}
@@ -100,6 +104,8 @@ func CreateProcServer(kind ProcKind) (Proc, error) {
 		proc = NewPutProcServer()
 	case ProcKind_Self:
 		proc = NewSelfProcServer()
+	case ProcKind_LocalPF:
+		proc = NewLocalPFProcServer()
 	default:
 		return nil, fmt.Errorf("proc kind=[%v] not registered", kind)
 	}

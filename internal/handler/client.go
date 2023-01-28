@@ -153,7 +153,9 @@ func determineProcByArgs(args []string, tty bool) (kind worker.ProcKind, spec an
 	case "put":
 		spec, err := parseGetPutArgs(args)
 		return worker.ProcKind_Put, spec, err
-	case "forward":
+	case "localpf":
+		spec, err := parseLocalPFArgs(args)
+		return worker.ProcKind_LocalPF, spec, err
 	case "socks5":
 	case "proxy":
 	case "self": // exit, remove
@@ -196,5 +198,15 @@ func parseSelfArgs(args []string) (worker.SelfSpec, error) {
 			return spec, fmt.Errorf("unknown action for 'self' command: %v", arg)
 		}
 	}
+	return spec, nil
+}
+
+func parseLocalPFArgs(args []string) (worker.LocalPFSpec, error) {
+	spec := worker.LocalPFSpec{}
+	if len(args) != 2 {
+		return spec, fmt.Errorf("expect args <LocalEndpoint> <RemoteEndpoint>")
+	}
+	spec.LocalEndpoint = args[0]
+	spec.RemoteEndpoint = args[1]
 	return spec, nil
 }

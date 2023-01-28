@@ -5,7 +5,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -19,7 +18,7 @@ func Connect(ctx context.Context, endpoint string, handler Handler, connInt time
 	logger.Info("target", endpoint)
 
 	connect := func() error {
-		conn, err := net.Dial(splitEndpoint(endpoint))
+		conn, err := net.Dial(helper.SplitEndpoint(endpoint))
 		if err != nil {
 			return err
 		}
@@ -50,7 +49,7 @@ func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) 
 
 	var listener net.Listener
 	{
-		network, address := splitEndpoint(endpoint)
+		network, address := helper.SplitEndpoint(endpoint)
 		if l, err := net.Listen(network, address); err != nil {
 			return err
 		} else {
@@ -110,18 +109,6 @@ func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) 
 	wg.Wait()
 
 	return nil
-}
-
-func splitEndpoint(endpoint string) (network string, address string) {
-	if strings.HasPrefix(endpoint, "unix:") {
-		ss := strings.SplitN(endpoint, ":", 2)
-		network = ss[0]
-		address = ss[1]
-	} else {
-		network = "tcp"
-		address = endpoint
-	}
-	return
 }
 
 func handleSignal(f func(), sig ...os.Signal) {
