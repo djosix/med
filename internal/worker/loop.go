@@ -253,6 +253,7 @@ func (loop *LoopImpl) Remove(procID uint32) bool {
 		logger.Debugf("cleanup")
 
 		close(pd.pktInCh)
+		pd.cancel()
 		delete(loop.procData, procID)
 
 		// Close remote proc
