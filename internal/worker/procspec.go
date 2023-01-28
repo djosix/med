@@ -8,27 +8,23 @@ import (
 )
 
 func SendProcSpec(ctx *ProcRunCtx, spec any) {
-	ctx.PacketOutputCh <- &pb.Packet{
+	ctx.OutputPacket(&pb.Packet{
 		Kind: pb.PacketKind_PacketKindInfo,
 		Data: helper.MustEncode(spec),
-	}
+	})
 }
 
 func RecvProcSpec[T any](ctx *ProcRunCtx) (*T, error) {
-	select {
-	case pkt := <-ctx.PacketInputCh:
-		if pkt == nil {
-			return nil, fmt.Errorf("input channel closed")
-		}
-		if pkt.Kind != pb.PacketKind_PacketKindInfo {
-			return nil, fmt.Errorf("not an info packet")
-		}
-		spec, err := helper.DecodeAs[T](pkt.Data)
-		if err != nil {
-			return nil, err
-		}
-		return &spec, nil
-	case <-ctx.Done():
-		return nil, fmt.Errorf("context cancelled")
+	pkt := ctx.InputPacket()
+	if pkt == nil {
+		return nil, fmt.Errorf("input channel closed")
 	}
+	if pkt.Kind != pb.PacketKind_PacketKindInfo {
+		return nil, fmt.Errorf("not an info packet")
+	}
+	spec, err := helper.DecodeAs[T](pkt.Data)
+	if err != nil {
+		return nil, err
+	}
+	return &spec, nil
 }
