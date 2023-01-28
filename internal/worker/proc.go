@@ -67,6 +67,10 @@ func CreateProcClient(kind ProcKind, spec any) (Proc, error) {
 		if spec, ok := spec.(GetPutSpec); ok {
 			proc = NewPutProcClient(spec)
 		}
+	case ProcKind_Self:
+		if spec, ok := spec.(SelfSpec); ok {
+			proc = NewSelfProcClient(spec)
+		}
 	default:
 		return nil, fmt.Errorf("proc kind=%v not registered", kind)
 	}
@@ -94,6 +98,8 @@ func CreateProcServer(kind ProcKind) (Proc, error) {
 		proc = NewGetProcServer()
 	case ProcKind_Put:
 		proc = NewPutProcServer()
+	case ProcKind_Self:
+		proc = NewSelfProcServer()
 	default:
 		return nil, fmt.Errorf("proc kind=[%v] not registered", kind)
 	}

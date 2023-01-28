@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/djosix/med/internal"
+	"github.com/djosix/med/internal/helper"
 	"github.com/djosix/med/internal/initializer"
 	"github.com/djosix/med/internal/logger"
 	"github.com/djosix/med/internal/worker"
@@ -115,9 +116,9 @@ func ClientHandler(ctx context.Context, rwc io.ReadWriteCloser) error {
 		panic("cannot get opts from ctx")
 	}
 
-	procKind, procSpec, err := DetermineProc(opts.Args, opts.IsTTY)
+	procKind, procSpec, err := determineProcByArgs(opts.Args, opts.IsTTY)
 	if err != nil {
-		return err
+		return fmt.Errorf("parse args: %w", err)
 	}
 
 	mainProc := worker.NewMainProcClient(worker.MainSpec{ExitWhenNoProc: true})
@@ -130,7 +131,7 @@ func ClientHandler(ctx context.Context, rwc io.ReadWriteCloser) error {
 	return nil
 }
 
-func DetermineProc(args []string, tty bool) (kind worker.ProcKind, spec any, err error) {
+func determineProcByArgs(args []string, tty bool) (kind worker.ProcKind, spec any, err error) {
 	defaultArgv := []string{"/bin/sh"}
 	if len(args) == 0 {
 		args = append([]string{"exec"}, defaultArgv...)
@@ -140,22 +141,24 @@ func DetermineProc(args []string, tty bool) (kind worker.ProcKind, spec any, err
 	args = args[1:]
 
 	switch action {
-	case "exec", "x":
+	case "exec", "x": // exec [command] [args]
 		spec := worker.ExecSpec{TTY: tty, ARGV: args}
 		if len(spec.ARGV) == 0 {
 			spec.ARGV = defaultArgv
 		}
 		return worker.ProcKind_Exec, spec, nil
 	case "get":
-		spec := parseGetPutArgs(args)
-		return worker.ProcKind_Get, spec, nil
+		spec, err := parseGetPutArgs(args)
+		return worker.ProcKind_Get, spec, err
 	case "put":
-		spec := parseGetPutArgs(args)
-		return worker.ProcKind_Put, spec, nil
+		spec, err := parseGetPutArgs(args)
+		return worker.ProcKind_Put, spec, err
 	case "forward":
 	case "socks5":
 	case "proxy":
-	case "self":
+	case "self": // exit, remove
+		spec, err := parseSelfArgs(args)
+		return worker.ProcKind_Self, spec, err
 	case "webui":
 	case "tmux":
 	}
@@ -163,16 +166,35 @@ func DetermineProc(args []string, tty bool) (kind worker.ProcKind, spec any, err
 	return worker.ProcKind_None, nil, fmt.Errorf("cannot determine root proc")
 }
 
-func parseGetPutArgs(args []string) worker.GetPutSpec {
+func parseGetPutArgs(args []string) (worker.GetPutSpec, error) {
 	spec := worker.GetPutSpec{}
 	flags := flag.NewFlagSet("get", flag.ExitOnError)
 	flags.BoolVar(&spec.IsGzipMode, "z", false, "enable gzip compression")
 	flags.BoolVar(&spec.IsTarMode, "t", false, "enable tar mode")
 	flags.StringVar(&spec.DestPath, "d", "", "destination")
-	flags.Parse(args)
-	// if flags.
-	// flags.Usage()
+	if err := flags.Parse(args); err != nil {
+		return spec, err
+	}
 	spec.SourcePaths = flags.Args()
 	logger.Debugf("parseGetPutArgs: spec = %#v", spec)
-	return spec
+	return spec, nil
+}
+
+func parseSelfArgs(args []string) (worker.SelfSpec, error) {
+	spec := worker.SelfSpec{}
+	args = helper.NewSet(args...).Values()
+	if len(args) == 0 {
+		return spec, fmt.Errorf("need some actions for 'self' command like: exit, remove")
+	}
+	for _, arg := range args {
+		switch arg {
+		case "exit":
+			spec.Exit = true
+		case "remove":
+			spec.Remove = true
+		default:
+			return spec, fmt.Errorf("unknown action for 'self' command: %v", arg)
+		}
+	}
+	return spec, nil
 }
