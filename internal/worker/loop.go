@@ -304,7 +304,7 @@ func (loop *LoopImpl) reader() {
 			continue
 		}
 
-		logger.Debug("pkt in (reader):", pkt)
+		// logger.Debug("pkt in (reader):", pkt)
 
 		loop.putPacketToChannelPassively(pkt, loop.pktInCh)
 	}
@@ -324,7 +324,7 @@ func (loop *LoopImpl) dispatcher() {
 		if pkt == nil {
 			return
 		}
-		logger.Debug("pkt in (dispatcher):", pkt)
+		// logger.Debug("pkt in (dispatcher):", pkt)
 
 		// Handle exit packet from remote loop
 		if pkt.SourceID == 0 && pb.IsPacketWithCtrlKind(pkt, pb.PacketCtrl_Exit) {
@@ -348,7 +348,7 @@ func (loop *LoopImpl) dispatcher() {
 		}
 
 		err := loop.dispatchToProc(pkt)
-		logger.Debug("dispatch to proc:", err)
+		// logger.Debug("dispatch to proc:", err)
 		if err != nil {
 			errPkt := &pb.Packet{
 				TargetID: pkt.SourceID,
@@ -376,7 +376,7 @@ func (loop *LoopImpl) writer() {
 			return
 		}
 
-		logger.Debug("pkt out:", pkt)
+		// logger.Debug("pkt out:", pkt)
 
 		buf, err := proto.Marshal(pkt)
 		if err != nil {

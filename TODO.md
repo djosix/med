@@ -1,8 +1,7 @@
 TODO
-- send and handle exit packet for all procs
 - implement procs
-    - get /remote/path [/local/path]
-    - put /local/path [/remote/path]
+    - get /remote/path [/local/path] tar and gz mode
+    - put /local/path [/remote/path] tar and gz mode
     - forward
         - forward local LOCAL_ENDPOINT REMOTE_ENDPOINT
             (listen on LOCAL_ENDPOINT -> connect to REMOTE_ENDPOINT)
@@ -13,10 +12,6 @@ TODO
         - proxy socks4a
         - proxy https
         - proxy http
-    - self
-        - self kill         # kill the med server process
-        - self remove       # remove the med binary
-        - self kill remove  # kill the med server process and remove the med binary
     - webui ENDPOINT
     - tmux [TMUX_SOCK_PATH]
         - open a window when each med server connects back to med
@@ -37,6 +32,5 @@ TODO
     - save actions (procs & actions)
     - save raw tcp streams to .pcapng files
 - relay: connect two clients or two servers
-    - med relay -c endpoint1 -c endpoint2
-    - med relay -l endpoint1 [-l endpoint2]
+    - while true; do cat -l 12333 -c 'ncat -l 12333'; sleep 1; done
 - if dispatcher get error, close the proc
