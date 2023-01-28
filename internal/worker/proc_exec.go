@@ -62,7 +62,7 @@ func NewExecProcClient(spec ExecSpec) *ExecProcClient {
 }
 
 func (p *ExecProcClient) Run(ctx *ProcRunCtx) {
-	logger := log.NewLogger("ExecProcClient")
+	logger := logger.NewLogger(string(p.Kind()))
 	logger.Debug("start")
 	defer logger.Debug("done")
 
@@ -224,7 +224,7 @@ func NewExecProcServer() *ExecProcServer {
 }
 
 func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
-	logger := logger.NewLogger("ExecProcServer")
+	logger := logger.NewLogger(string(p.Kind()))
 	logger.Debug("start")
 	defer logger.Debug("done")
 

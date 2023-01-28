@@ -38,7 +38,7 @@ func NewGetProcClient(spec GetPutSpec) *GetProcClient {
 }
 
 func (p *GetProcClient) Run(ctx *ProcRunCtx) {
-	logger := logger.NewLogger("GetProcClient")
+	logger := logger.NewLogger(string(p.Kind()))
 	logger.Debug("start")
 	defer logger.Debug("done")
 
@@ -77,7 +77,7 @@ func NewGetProcServer() *GetProcServer {
 }
 
 func (p *GetProcServer) Run(ctx *ProcRunCtx) {
-	logger := logger.NewLogger("GetProcServer")
+	logger := logger.NewLogger(string(p.Kind()))
 	logger.Debug("start")
 	defer logger.Debug("done")
 
@@ -120,7 +120,7 @@ func NewPutProcClient(spec GetPutSpec) *PutProcClient {
 }
 
 func (p *PutProcClient) Run(ctx *ProcRunCtx) {
-	logger := logger.NewLogger("PutProcClient")
+	logger := logger.NewLogger(string(p.Kind()))
 	logger.Debug("start")
 	defer logger.Debug("done")
 
@@ -193,7 +193,7 @@ func NewPutProcServer() *PutProcServer {
 }
 
 func (p *PutProcServer) Run(ctx *ProcRunCtx) {
-	logger := logger.NewLogger("PutProcServer")
+	logger := logger.NewLogger(string(p.Kind()))
 	logger.Debug("start")
 	defer logger.Debug("done")
 

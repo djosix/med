@@ -140,7 +140,7 @@ func DetermineProc(args []string, tty bool) (kind worker.ProcKind, spec any, err
 	args = args[1:]
 
 	switch action {
-	case "exec":
+	case "exec", "x":
 		spec := worker.ExecSpec{TTY: tty, ARGV: args}
 		if len(spec.ARGV) == 0 {
 			spec.ARGV = defaultArgv

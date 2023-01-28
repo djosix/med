@@ -61,7 +61,7 @@ func NewMainProcClient(spec MainSpec) *MainProcClient {
 }
 
 func (p *MainProcClient) Run(ctx *ProcRunCtx) {
-	logger := logger.NewLogger("MainProcClient")
+	logger := logger.NewLogger(string(p.Kind()))
 	logger.Debug("start")
 	defer logger.Debug("done")
 
@@ -226,7 +226,7 @@ func NewMainProcServer() *MainProcServer {
 }
 
 func (p *MainProcServer) Run(ctx *ProcRunCtx) {
-	logger := logger.NewLogger("ServerMainProc")
+	logger := logger.NewLogger(string(p.Kind()))
 	logger.Debug("start")
 	defer logger.Debug("done")
 
