@@ -16,9 +16,9 @@ func NewCtrlPacket(data []byte) *pb.Packet {
 	}
 }
 
-func NewErrorPacket(data []byte) *pb.Packet {
+func NewErrorPacket(s string) *pb.Packet {
 	return &pb.Packet{
 		Kind: pb.PacketKind_PacketKindError,
-		Data: data,
+		Data: []byte(s),
 	}
 }

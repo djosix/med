@@ -17,17 +17,31 @@ type ProcRunCtx struct {
 	context.Context                    // proc ctx
 	Cancel          context.CancelFunc // cancel proc ctx
 	Loop            Loop               // the loop running proc
-	PktOutCh        chan<- *pb.Packet  // packet output channel
-	PktInCh         <-chan *pb.Packet  // packet input channel
 	ProcID          uint32
+	pktOutCh        chan<- *pb.Packet // packet output channel
+	pktOutDone      <-chan struct{}
+	pktInCh         <-chan *pb.Packet // packet input channel
 }
 
-func (p *ProcRunCtx) Output(pkt *pb.Packet) bool {
+func (p *ProcRunCtx) PacketOutput(pkt *pb.Packet) bool {
 	select {
-	case p.PktOutCh <- pkt:
+	case p.pktOutCh <- pkt:
 		return true
-	case <-p.Loop.Done():
+	case <-p.pktOutDone:
 		return false
+	}
+}
+
+func (p *ProcRunCtx) PacketInput() *pb.Packet {
+	return p.PacketInputWithDone(p.Done())
+}
+
+func (p *ProcRunCtx) PacketInputWithDone(done <-chan struct{}) *pb.Packet {
+	select {
+	case pkt := <-p.pktInCh:
+		return pkt
+	case <-done:
+		return nil
 	}
 }
 

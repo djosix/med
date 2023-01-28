@@ -12,7 +12,7 @@ import (
 
 	"github.com/djosix/med/internal/helper"
 	"github.com/djosix/med/internal/logger"
-	"github.com/muesli/cancelreader"
+	pb "github.com/djosix/med/internal/protobuf"
 )
 
 type GetPutSpec struct {
@@ -30,7 +30,7 @@ type GetProcClient struct {
 }
 
 func NewGetProcClient(spec GetPutSpec) *GetProcClient {
-	preprocessGetPutSpec(&spec)
+	initGetPutSpec(&spec)
 	return &GetProcClient{
 		ProcInfo: NewProcInfo(ProcKind_Get, ProcSide_Client),
 		spec:     spec,
@@ -42,7 +42,7 @@ func (p *GetProcClient) Run(ctx *ProcRunCtx) {
 	logger.Debug("start")
 	defer logger.Debug("done")
 
-	destPaths, err := initGetPutRecvSide(&p.spec)
+	dstPaths, err := initGetPutRecvSide(&p.spec)
 	if err != nil {
 		logger.Error(err)
 		return
@@ -53,8 +53,14 @@ func (p *GetProcClient) Run(ctx *ProcRunCtx) {
 	spec.DestPath = ""
 	SendProcSpec(ctx, p.spec)
 
-	for err := range recvFiles(ctx, destPaths) {
-		logger.Error("error:", err)
+	for result := range recvFiles(ctx, spec.SourcePaths, dstPaths) {
+		if result.dst == "" {
+			logger.Errorf("error: %v", result.err)
+		} else if result.err != nil {
+			logger.Errorf("remote %#v to %#v error: %v", result.src, result.dst, result.err)
+		} else {
+			logger.Infof("remote %#v to %#v (success)", result.src, result.dst)
+		}
 	}
 }
 
@@ -83,8 +89,10 @@ func (p *GetProcServer) Run(ctx *ProcRunCtx) {
 	logger.Debugf("spec: %#v", spec)
 
 	for i, path := range spec.SourcePaths {
-		err := sendFile(ctx, i, path)
+		err := sendFileData(ctx, i, path)
+		logger.Debugf("sent data [%v] i=%v err=%v", path, i, err)
 		if err == ErrLoopClosed {
+			logger.Debug("ErrLoopClosed")
 			return
 		} else if err != nil {
 			logger.Debugf("send file [%v]: %v", path, err)
@@ -92,6 +100,7 @@ func (p *GetProcServer) Run(ctx *ProcRunCtx) {
 		if !sendFileEnd(ctx, i, path, err) {
 			return
 		}
+		logger.Debugf("sent end [%v] i=%v err=%v", path, i, err)
 	}
 }
 
@@ -103,6 +112,7 @@ type PutProcClient struct {
 }
 
 func NewPutProcClient(spec GetPutSpec) *PutProcClient {
+	initGetPutSpec(&spec)
 	return &PutProcClient{
 		ProcInfo: NewProcInfo(ProcKind_Get, ProcSide_Client),
 		spec:     spec,
@@ -116,8 +126,47 @@ func (p *PutProcClient) Run(ctx *ProcRunCtx) {
 
 	SendProcSpec(ctx, p.spec)
 
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+		for {
+			pkt := ctx.PacketInput()
+			if pkt == nil {
+				return
+			}
+			buf := bytes.NewBuffer(pkt.Data)
+			var srcPath string
+			{
+				u, err := binary.ReadUvarint(buf)
+				if err != nil {
+					logger.Error("cannot read file index")
+					continue
+				}
+				srcPath = p.spec.SourcePaths[int(u)]
+			}
+			var dstPath string
+			var errStr string
+			{
+				u, err := binary.ReadUvarint(buf)
+				if err != nil {
+					logger.Error("cannot read file index")
+					continue
+				}
+				buf := buf.Bytes()
+				dstPath = string(buf[:int(u)])
+				errStr = string(buf[int(u):])
+			}
+			if errStr == "" {
+				logger.Infof("copy %#v to remote %#v (success)", srcPath, dstPath)
+			} else {
+				logger.Infof("copy %#v to remote %#v error: %v", srcPath, dstPath, errStr)
+			}
+		}
+	}()
+
 	for i, path := range p.spec.SourcePaths {
-		err := sendFile(ctx, i, path)
+		err := sendFileData(ctx, i, path)
 		if err == ErrLoopClosed {
 			return
 		} else if err != nil {
@@ -127,6 +176,8 @@ func (p *PutProcClient) Run(ctx *ProcRunCtx) {
 			return
 		}
 	}
+
+	<-done
 }
 
 // Put Server
@@ -154,20 +205,35 @@ func (p *PutProcServer) Run(ctx *ProcRunCtx) {
 	}
 	logger.Debugf("spec: %#v", spec)
 
-	destPaths, err := initGetPutRecvSide(spec)
+	dstPaths, err := initGetPutRecvSide(spec)
 	if err != nil {
 		logger.Error(err)
 		return
 	}
 
-	for err := range recvFiles(ctx, destPaths) {
-		logger.Error("error:", err)
+	makeRespPkt := func(idx int, dstPath string, err error) *pb.Packet {
+		buf := []byte{}
+		buf = binary.AppendUvarint(buf, uint64(idx))
+		buf = binary.AppendUvarint(buf, uint64(len(dstPath)))
+		buf = append(buf, []byte(dstPath)...)
+		if err != nil {
+			buf = append(buf, []byte(err.Error())...)
+		}
+		return helper.NewDataPacket(buf)
+	}
+
+	for result := range recvFiles(ctx, spec.SourcePaths, dstPaths) {
+		if result.dst == "" && result.err != nil {
+			ctx.PacketOutput(helper.NewErrorPacket(err.Error()))
+		} else {
+			ctx.PacketOutput(makeRespPkt(result.idx, result.dst, result.err))
+		}
 	}
 }
 
 //
 
-func preprocessGetPutSpec(spec *GetPutSpec) {
+func initGetPutSpec(spec *GetPutSpec) {
 	if spec.DestPath == "" {
 		spec.DestPath = "."
 	}
@@ -187,25 +253,28 @@ func initGetPutRecvSide(spec *GetPutSpec) (destPaths []string, err error) {
 
 	stat, err := os.Stat(spec.DestPath)
 
-	var isDestDir bool
+	var exists bool = false
+	var isDir bool
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			if err := os.MkdirAll(spec.DestPath, 0755); err != nil {
-				return nil, err
-			}
-			isDestDir = true
-		} else {
+		if !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
 	} else {
-		isDestDir = stat.IsDir()
+		exists = true
+		isDir = stat.IsDir()
 	}
 
 	if !spec.IsTarMode {
 		// normal mode like cp
 
 		if len(spec.SourcePaths) > 1 {
-			if !isDestDir {
+			if !exists {
+				if err := os.MkdirAll(spec.DestPath, 0755); err != nil {
+					return nil, err
+				}
+				isDir = true
+			}
+			if !isDir {
 				return nil, fmt.Errorf("cannot copy multiple entries to a file, try tar mode")
 			}
 
@@ -223,7 +292,7 @@ func initGetPutRecvSide(spec *GetPutSpec) (destPaths []string, err error) {
 
 		} else {
 			destPath := spec.DestPath
-			if isDestDir {
+			if isDir {
 				destPath = filepath.Join(destPath, filepath.Base(spec.SourcePaths[0]))
 			}
 			return append(destPaths, destPath), nil
@@ -232,7 +301,7 @@ func initGetPutRecvSide(spec *GetPutSpec) (destPaths []string, err error) {
 	} else {
 		// tar mode
 
-		if !isDestDir {
+		if !isDir {
 			return nil, fmt.Errorf("cannot extract tar to a file")
 		}
 
@@ -240,37 +309,27 @@ func initGetPutRecvSide(spec *GetPutSpec) (destPaths []string, err error) {
 	}
 }
 
-func sendFile(ctx *ProcRunCtx, idx int, path string) error {
+func sendFileData(ctx *ProcRunCtx, idx int, path string) error {
 	f, err := os.Open(path)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 
-	r, err := cancelreader.NewReader(f)
-	if err != nil {
-		return err
-	}
-	defer r.Close()
-
-	{
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
-		go func() { <-ctx.Done(); r.Cancel() }()
-	}
+	recvCtx, recvCancel := context.WithCancel(ctx)
+	defer recvCancel()
+	go func() { <-recvCtx.Done(); f.Close() }()
 
 	data := make([]byte, 4096)
 	var headerLen int
 	{
-		data[0] = 0 // 0=data
 		header := binary.AppendUvarint([]byte{0}, uint64(idx))
-		copy(data[1:], header)
+		copy(data, header)
 		headerLen = len(header)
 	}
 	// bytes.NewReader()
 
 	for {
-		n, err := r.Read(data[headerLen:])
+		n, err := f.Read(data[headerLen:])
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				return nil
@@ -278,7 +337,7 @@ func sendFile(ctx *ProcRunCtx, idx int, path string) error {
 			return err
 		}
 
-		if !ctx.Output(helper.NewDataPacket(data[:headerLen+n])) {
+		if !ctx.PacketOutput(helper.NewDataPacket(data[:headerLen+n])) {
 			return ErrLoopClosed
 		}
 	}
@@ -290,23 +349,31 @@ func sendFileEnd(ctx *ProcRunCtx, idx int, path string, err error) bool {
 	if err != nil {
 		data = append(data, []byte(err.Error())...)
 	}
-	return ctx.Output(helper.NewDataPacket(data))
+	return ctx.PacketOutput(helper.NewDataPacket(data))
 }
 
-func recvFiles(ctx *ProcRunCtx, destPaths []string) <-chan error {
-	ch := make(chan error)
+type recvFileResult struct {
+	idx int
+	src string
+	dst string
+	err error
+}
+
+func recvFiles(ctx *ProcRunCtx, srcPaths []string, dstPaths []string) <-chan *recvFileResult {
+	ch := make(chan *recvFileResult)
 
 	go func() {
 		defer close(ch)
 
-		files := make([]*os.File, len(destPaths))
-		done := make([]bool, len(destPaths))
+		files := make([]*os.File, len(dstPaths))
+		done := make([]bool, len(dstPaths))
 		doneCount := 0
 
-		for doneCount < len(destPaths) {
-			pkt, ok := <-ctx.PktInCh
-			if !ok {
-				ch <- io.EOF
+		for doneCount < len(dstPaths) {
+			pkt := ctx.PacketInput()
+			if pkt == nil {
+				err := fmt.Errorf("cannot read packet")
+				ch <- &recvFileResult{err: err}
 				return
 			}
 
@@ -316,7 +383,8 @@ func recvFiles(ctx *ProcRunCtx, destPaths []string) <-chan error {
 			{
 				b, err := r.ReadByte()
 				if err != nil {
-					ch <- err
+					err = fmt.Errorf("cannot read byte: %w", err)
+					ch <- &recvFileResult{err: err}
 					return
 				}
 				end = (b == 1)
@@ -326,11 +394,13 @@ func recvFiles(ctx *ProcRunCtx, destPaths []string) <-chan error {
 			{
 				b, err := binary.ReadUvarint(r)
 				if err != nil {
-					ch <- fmt.Errorf("cannot get file index")
+					err = fmt.Errorf("cannot get file index: %w", err)
+					ch <- &recvFileResult{err: err}
 					return
 				}
-				if b > uint64(len(destPaths)) {
-					ch <- fmt.Errorf("invalid file index")
+				if b > uint64(len(dstPaths)) {
+					err = fmt.Errorf("invalid file index: %v/%v", b, len(dstPaths))
+					ch <- &recvFileResult{err: err}
 					return
 				}
 				idx = int(b)
@@ -343,9 +413,10 @@ func recvFiles(ctx *ProcRunCtx, destPaths []string) <-chan error {
 				}
 
 				if files[idx] == nil {
-					newf, err := os.OpenFile(destPaths[idx], os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+					newf, err := os.OpenFile(dstPaths[idx], os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 					if err != nil {
-						ch <- err
+						err = fmt.Errorf("open [%v]:", dstPaths[idx])
+						ch <- &recvFileResult{err: err}
 						return
 					}
 					defer newf.Close()
@@ -367,13 +438,21 @@ func recvFiles(ctx *ProcRunCtx, destPaths []string) <-chan error {
 					logger.Warn("receive end message twice")
 				}
 
+				result := &recvFileResult{
+					idx: idx,
+					src: srcPaths[idx],
+					dst: dstPaths[idx],
+				}
+
 				if r.Len() > 0 {
 					buf := bytes.NewBuffer(nil)
 					r.WriteTo(buf)
 					errMsg := string(buf.Bytes())
 
-					ch <- fmt.Errorf("receive [%v] remote: %v", destPaths[idx], errMsg)
+					result.err = fmt.Errorf("remote: %v", errMsg)
 				}
+
+				ch <- result
 			}
 		}
 	}()

@@ -165,11 +165,13 @@ func DetermineProc(args []string, tty bool) (kind worker.ProcKind, spec any, err
 
 func parseGetPutArgs(args []string) worker.GetPutSpec {
 	spec := worker.GetPutSpec{}
-	flags := flag.NewFlagSet("get", flag.ContinueOnError)
+	flags := flag.NewFlagSet("get", flag.ExitOnError)
 	flags.BoolVar(&spec.IsGzipMode, "z", false, "enable gzip compression")
 	flags.BoolVar(&spec.IsTarMode, "t", false, "enable tar mode")
 	flags.StringVar(&spec.DestPath, "d", "", "destination")
 	flags.Parse(args)
+	// if flags.
+	// flags.Usage()
 	spec.SourcePaths = flags.Args()
 	logger.Debugf("parseGetPutArgs: spec = %#v", spec)
 	return spec
