@@ -281,10 +281,10 @@ func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
 				}
 
 				// logger.Debugf("send %#v", string(buf))
-				ctx.PacketOutputCh <- &pb.Packet{
+				ctx.OutputPacket(&pb.Packet{
 					Kind: pb.PacketKind_PacketKindData,
 					Data: append(buf, fd), // the last byte represents the output fd
-				}
+				})
 			}
 		}()
 	}
@@ -370,13 +370,8 @@ func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
 
 	forLoop:
 		for {
-			var pkt *pb.Packet
-			select {
-			case pkt = <-ctx.PacketInputCh:
-				if pkt == nil {
-					return
-				}
-			case <-ctx1.Done():
+			pkt := ctx.InputPacketWithDone(ctx1.Done())
+			if pkt == nil {
 				return
 			}
 
@@ -417,5 +412,4 @@ func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
 	logger.Debug("wait done")
 
 	ctx.OutputPacket(pb.NewCtrlPacket(ctx.ProcID, pb.PacketCtrl_Exit))
-	// ctx.Cancel()
 }
