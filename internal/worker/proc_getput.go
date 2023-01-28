@@ -131,7 +131,7 @@ func (p *PutProcClient) Run(ctx *ProcRunCtx) {
 	go func() {
 		defer close(done)
 		for {
-			pkt := ctx.PacketInput()
+			pkt := ctx.InputPacket()
 			if pkt == nil {
 				return
 			}
@@ -370,7 +370,7 @@ func recvFiles(ctx *ProcRunCtx, srcPaths []string, dstPaths []string) <-chan *re
 		doneCount := 0
 
 		for doneCount < len(dstPaths) {
-			pkt := ctx.PacketInput()
+			pkt := ctx.InputPacket()
 			if pkt == nil {
 				err := fmt.Errorf("cannot read packet")
 				ch <- &recvFileResult{err: err}

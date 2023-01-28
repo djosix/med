@@ -8,7 +8,7 @@ import (
 )
 
 func SendProcSpec(ctx *ProcRunCtx, spec any) {
-	ctx.pktOutCh <- &pb.Packet{
+	ctx.PacketOutputCh <- &pb.Packet{
 		Kind: pb.PacketKind_PacketKindInfo,
 		Data: helper.MustEncode(spec),
 	}
@@ -16,7 +16,7 @@ func SendProcSpec(ctx *ProcRunCtx, spec any) {
 
 func RecvProcSpec[T any](ctx *ProcRunCtx) (*T, error) {
 	select {
-	case pkt := <-ctx.pktInCh:
+	case pkt := <-ctx.PacketInputCh:
 		if pkt == nil {
 			return nil, fmt.Errorf("input channel closed")
 		}

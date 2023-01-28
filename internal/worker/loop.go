@@ -38,8 +38,8 @@ type LoopImpl struct {
 
 	runLock sync.Mutex
 
-	pktInCh         chan *pb.Packet
-	pktOutCh        chan *pb.Packet // will have multiple senders so never close it
+	packetInputCh   chan *pb.Packet
+	packetOutputCh  chan *pb.Packet // will have multiple senders so never close it
 	frameRW         readwriter.FrameReadWriter
 	closer          io.Closer
 	dispatchTimeout time.Duration
@@ -85,8 +85,8 @@ func NewLoop(ctx context.Context, rwc io.ReadWriteCloser) *LoopImpl {
 
 		runLock: sync.Mutex{},
 
-		pktInCh:         make(chan *pb.Packet, 0),
-		pktOutCh:        make(chan *pb.Packet, 0),
+		packetInputCh:   make(chan *pb.Packet, 0),
+		packetOutputCh:  make(chan *pb.Packet, 0),
 		frameRW:         frameRw,
 		closer:          rwc,
 		dispatchTimeout: time.Duration(1) * time.Second,
@@ -127,7 +127,7 @@ func (loop *LoopImpl) Run() {
 	loop.procWg.Wait()
 	logger.Debug("all procs done")
 
-	close(loop.pktOutCh)
+	close(loop.packetOutputCh)
 
 	loop.wg.Wait()
 	logger.Debug("all loops done")
@@ -180,7 +180,7 @@ func (loop *LoopImpl) StartLater(proc Proc) (procID uint32, handle func(bool) <-
 			pkt.SourceID = procID
 			pkt.TargetID = procID
 
-			loop.pktOutCh <- pkt
+			loop.packetOutputCh <- pkt
 			// ok := loop.putPacketToChannel(pkt, loop.pktOutCh)
 			// if !ok {
 			// 	return
@@ -200,13 +200,13 @@ func (loop *LoopImpl) StartLater(proc Proc) (procID uint32, handle func(bool) <-
 		}()
 
 		runCtx := ProcRunCtx{
-			Context:    ctx,
-			Cancel:     cancel,
-			Loop:       loop,
-			pktInCh:    pktInCh,
-			pktOutCh:   pktOutCh,
-			pktOutDone: loop.writeDone,
-			ProcID:     procID,
+			Context:        ctx,
+			Cancel:         cancel,
+			Loop:           loop,
+			PacketInputCh:  pktInCh,
+			PacketOutputCh: pktOutCh,
+			pktOutDone:     loop.writeDone,
+			ProcID:         procID,
 		}
 		proc.Run(&runCtx)
 
@@ -260,7 +260,7 @@ func (loop *LoopImpl) Remove(procID uint32) bool {
 		go func() {
 			defer loop.procWg.Done()
 			pkt := pb.NewCtrlPacket(procID, pb.PacketCtrl_Exit)
-			loop.putPacketToChannel(pkt, loop.pktOutCh)
+			loop.putPacketToChannel(pkt, loop.packetOutputCh)
 		}()
 	}
 
@@ -288,7 +288,7 @@ func (loop *LoopImpl) reader() {
 	logger.Debug("start")
 	defer logger.Debug("done")
 
-	defer close(loop.pktInCh)
+	defer close(loop.packetInputCh)
 
 	for loop.isActive() {
 		frame, err := loop.frameRW.ReadFrame()
@@ -306,7 +306,7 @@ func (loop *LoopImpl) reader() {
 
 		// logger.Debug("pkt in (reader):", pkt)
 
-		loop.putPacketToChannelPassively(pkt, loop.pktInCh)
+		loop.putPacketToChannelPassively(pkt, loop.packetInputCh)
 	}
 }
 
@@ -320,7 +320,7 @@ func (loop *LoopImpl) dispatcher() {
 	defer close(loop.dispatchDone)
 
 	for {
-		pkt := loop.drainPacketFromChannel(loop.pktInCh)
+		pkt := loop.drainPacketFromChannel(loop.packetInputCh)
 		if pkt == nil {
 			return
 		}
@@ -356,7 +356,7 @@ func (loop *LoopImpl) dispatcher() {
 				Kind:     pb.PacketKind_PacketKindError,
 				Data:     []byte(err.Error()),
 			}
-			loop.putPacketToChannelPassively(errPkt, loop.pktOutCh)
+			loop.putPacketToChannelPassively(errPkt, loop.packetOutputCh)
 		}
 	}
 }
@@ -371,7 +371,7 @@ func (loop *LoopImpl) writer() {
 	defer loop.closer.Close()
 
 	for {
-		pkt, ok := <-loop.pktOutCh
+		pkt, ok := <-loop.packetOutputCh
 		if !ok {
 			return
 		}
