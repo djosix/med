@@ -118,13 +118,14 @@ func (p *ExecProcClient) Run(ctx *ProcRunCtx) {
 					logger.Error("cannot get winSize")
 					continue
 				}
-				ctx.PacketOutputCh <- &pb.Packet{
+
+				ctx.OutputPacket(&pb.Packet{
 					Kind: pb.PacketKind_PacketKindInfo,
 					Data: helper.MustEncode(&ExecInfo{
 						Kind: ExecInfoKind_WinSize,
 						Data: helper.MustEncode(winSize),
 					}),
-				}
+				})
 			}
 		}()
 	}
@@ -140,13 +141,8 @@ func (p *ExecProcClient) Run(ctx *ProcRunCtx) {
 		defer logger.Debug("done")
 
 		for {
-			var pkt *pb.Packet
-			select {
-			case pkt = <-ctx.PacketInputCh:
-				if pkt == nil {
-					return
-				}
-			case <-ctx1.Done():
+			pkt := ctx.InputPacket()
+			if pkt == nil {
 				return
 			}
 
@@ -190,12 +186,10 @@ func (p *ExecProcClient) Run(ctx *ProcRunCtx) {
 				logger.Debugf("stdin: n=[%v] err=[%v]", n, err)
 				return
 			}
-			pkt := &pb.Packet{
+			ctx.OutputPacket(&pb.Packet{
 				Kind: pb.PacketKind_PacketKindData,
 				Data: helper.Clone(buf[:n]),
-			}
-
-			ctx.PacketOutputCh <- pkt
+			})
 		}
 	}()
 
@@ -422,6 +416,6 @@ func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
 	wg.Wait()
 	logger.Debug("wait done")
 
-	ctx.PacketOutputCh <- pb.NewCtrlPacket(ctx.ProcID, pb.PacketCtrl_Exit)
-	ctx.Cancel()
+	ctx.OutputPacket(pb.NewCtrlPacket(ctx.ProcID, pb.PacketCtrl_Exit))
+	// ctx.Cancel()
 }

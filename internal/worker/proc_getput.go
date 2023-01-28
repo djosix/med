@@ -224,9 +224,9 @@ func (p *PutProcServer) Run(ctx *ProcRunCtx) {
 
 	for result := range recvFiles(ctx, spec.SourcePaths, dstPaths) {
 		if result.dst == "" && result.err != nil {
-			ctx.PacketOutput(helper.NewErrorPacket(err.Error()))
+			ctx.OutputPacket(helper.NewErrorPacket(err.Error()))
 		} else {
-			ctx.PacketOutput(makeRespPkt(result.idx, result.dst, result.err))
+			ctx.OutputPacket(makeRespPkt(result.idx, result.dst, result.err))
 		}
 	}
 }
@@ -337,7 +337,7 @@ func sendFileData(ctx *ProcRunCtx, idx int, path string) error {
 			return err
 		}
 
-		if !ctx.PacketOutput(helper.NewDataPacket(data[:headerLen+n])) {
+		if !ctx.OutputPacket(helper.NewDataPacket(data[:headerLen+n])) {
 			return ErrLoopClosed
 		}
 	}
@@ -349,7 +349,7 @@ func sendFileEnd(ctx *ProcRunCtx, idx int, path string, err error) bool {
 	if err != nil {
 		data = append(data, []byte(err.Error())...)
 	}
-	return ctx.PacketOutput(helper.NewDataPacket(data))
+	return ctx.OutputPacket(helper.NewDataPacket(data))
 }
 
 type recvFileResult struct {

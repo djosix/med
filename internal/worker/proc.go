@@ -23,7 +23,7 @@ type ProcRunCtx struct {
 	PacketInputCh   <-chan *pb.Packet // packet input channel
 }
 
-func (ctx *ProcRunCtx) PacketOutput(pkt *pb.Packet) bool {
+func (ctx *ProcRunCtx) OutputPacket(pkt *pb.Packet) bool {
 	select {
 	case ctx.PacketOutputCh <- pkt:
 		return true
