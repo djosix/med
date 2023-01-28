@@ -114,7 +114,7 @@ type PutProcClient struct {
 func NewPutProcClient(spec GetPutSpec) *PutProcClient {
 	initGetPutSpec(&spec)
 	return &PutProcClient{
-		ProcInfo: NewProcInfo(ProcKind_Get, ProcSide_Client),
+		ProcInfo: NewProcInfo(ProcKind_Put, ProcSide_Client),
 		spec:     spec,
 	}
 }
@@ -158,9 +158,9 @@ func (p *PutProcClient) Run(ctx *ProcRunCtx) {
 				errStr = string(buf[int(u):])
 			}
 			if errStr == "" {
-				logger.Infof("copy %#v to remote %#v (success)", srcPath, dstPath)
+				logger.Infof("%#v to remote %#v (success)", srcPath, dstPath)
 			} else {
-				logger.Infof("copy %#v to remote %#v error: %v", srcPath, dstPath, errStr)
+				logger.Infof("%#v to remote %#v error: %v", srcPath, dstPath, errStr)
 			}
 		}
 	}()
@@ -188,7 +188,7 @@ type PutProcServer struct {
 
 func NewPutProcServer() *PutProcServer {
 	return &PutProcServer{
-		ProcInfo: NewProcInfo(ProcKind_Get, ProcSide_Server),
+		ProcInfo: NewProcInfo(ProcKind_Put, ProcSide_Server),
 	}
 }
 
@@ -449,7 +449,7 @@ func recvFiles(ctx *ProcRunCtx, srcPaths []string, dstPaths []string) <-chan *re
 					r.WriteTo(buf)
 					errMsg := string(buf.Bytes())
 
-					result.err = fmt.Errorf("remote: %v", errMsg)
+					result.err = fmt.Errorf(errMsg)
 				}
 
 				ch <- result

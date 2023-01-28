@@ -178,13 +178,8 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 		defer wg.Done()
 	forLoop:
 		for {
-			var pkt *pb.Packet
-			select {
-			case pkt = <-ctx.PacketInputCh:
-				if pkt == nil {
-					return
-				}
-			case <-ctx.Done():
+			pkt := ctx.InputPacket()
+			if pkt == nil {
 				return
 			}
 

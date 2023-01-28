@@ -23,24 +23,24 @@ type ProcRunCtx struct {
 	PacketInputCh   <-chan *pb.Packet // packet input channel
 }
 
-func (p *ProcRunCtx) PacketOutput(pkt *pb.Packet) bool {
+func (ctx *ProcRunCtx) PacketOutput(pkt *pb.Packet) bool {
 	select {
-	case p.PacketOutputCh <- pkt:
+	case ctx.PacketOutputCh <- pkt:
 		return true
-	case <-p.pktOutDone:
+	case <-ctx.pktOutDone:
 		return false
 	}
 }
 
-func (p *ProcRunCtx) InputPacket() *pb.Packet {
-	return p.InputPacketWithDone(p.Done())
+func (ctx *ProcRunCtx) InputPacket() *pb.Packet {
+	return ctx.InputPacketWithDone(ctx.Done())
 }
 
-func (p *ProcRunCtx) InputPacketWithDone(done <-chan struct{}) *pb.Packet {
+func (ctx *ProcRunCtx) InputPacketWithDone(doneCh <-chan struct{}) *pb.Packet {
 	select {
-	case pkt := <-p.PacketInputCh:
+	case pkt := <-ctx.PacketInputCh:
 		return pkt
-	case <-done:
+	case <-doneCh:
 		return nil
 	}
 }
