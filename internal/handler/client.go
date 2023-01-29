@@ -132,32 +132,28 @@ func ClientHandler(ctx context.Context, rwc io.ReadWriteCloser) error {
 }
 
 func determineProcByArgs(args []string, tty bool) (kind worker.ProcKind, spec any, err error) {
-	defaultArgv := []string{"/bin/sh"}
 	if len(args) == 0 {
-		args = append([]string{"exec"}, defaultArgv...)
+		args = []string{"exec"}
 	}
-
-	action := args[0]
+	cmd := args[0]
 	args = args[1:]
 
-	switch action {
+	switch cmd {
 	case "exec", "x": // exec [command] [args]
 		spec := worker.ExecSpec{TTY: tty, ARGV: args}
-		if len(spec.ARGV) == 0 {
-			spec.ARGV = defaultArgv
+		if len(args) == 0 {
+			spec.ARGV = []string{"/usr/bin/env", "bash"}
 		}
 		return worker.ProcKind_Exec, spec, nil
-	case "get":
-		spec, err := parseGetPutArgs(args)
-		return worker.ProcKind_Get, spec, err
-	case "put":
-		spec, err := parseGetPutArgs(args)
-		return worker.ProcKind_Put, spec, err
+	case "get", "put":
+		return parseGetPutArgs(cmd, args)
 	case "forward":
 		return parseForwardArgs(args, true)
-	case "socks5":
+	case "local", "remote":
+		return parseForwardArgs(append([]string{cmd}, args...), true)
 	case "proxy":
-	case "self": // exit, remove
+	case "socks":
+	case "self":
 		spec, err := parseSelfArgs(args)
 		return worker.ProcKind_Self, spec, err
 	case "webui":
@@ -167,18 +163,25 @@ func determineProcByArgs(args []string, tty bool) (kind worker.ProcKind, spec an
 	return worker.ProcKind_None, nil, fmt.Errorf("cannot determine root proc")
 }
 
-func parseGetPutArgs(args []string) (worker.GetPutSpec, error) {
-	spec := worker.GetPutSpec{}
+func parseGetPutArgs(action string, args []string) (kind worker.ProcKind, spec worker.GetPutSpec, err error) {
 	flags := flag.NewFlagSet("get", flag.ExitOnError)
 	flags.BoolVar(&spec.IsGzipMode, "z", false, "enable gzip compression")
 	flags.BoolVar(&spec.IsTarMode, "t", false, "enable tar mode")
 	flags.StringVar(&spec.DestPath, "d", "", "destination")
-	if err := flags.Parse(args); err != nil {
-		return spec, err
+	if err = flags.Parse(args); err != nil {
+		return
 	}
 	spec.SourcePaths = flags.Args()
 	logger.Debugf("parseGetPutArgs: spec = %#v", spec)
-	return spec, nil
+	switch action {
+	case "get":
+		kind = worker.ProcKind_Get
+	case "put":
+		kind = worker.ProcKind_Put
+	default:
+		panic(action)
+	}
+	return
 }
 
 func parseSelfArgs(args []string) (worker.SelfSpec, error) {

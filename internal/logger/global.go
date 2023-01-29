@@ -20,7 +20,7 @@ const (
 )
 
 var (
-	logTarget    io.Writer = os.Stdout
+	logTarget    io.Writer = os.Stderr
 	logLevel     LogLevel  = LevelInfo
 	logLevelText           = [6]string{
 		"",
