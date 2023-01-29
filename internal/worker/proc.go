@@ -72,8 +72,12 @@ func CreateProcClient(kind ProcKind, spec any) (Proc, error) {
 			proc = NewSelfProcClient(spec)
 		}
 	case ProcKind_LocalPF:
-		if spec, ok := spec.(LocalPFSpec); ok {
+		if spec, ok := spec.(ForwardSpec); ok {
 			proc = NewLocalPFProcClient(spec)
+		}
+	case ProcKind_RemotePF:
+		if spec, ok := spec.(ForwardSpec); ok {
+			proc = NewRemotePFProcClient(spec)
 		}
 	default:
 		return nil, fmt.Errorf("proc kind=%v not registered", kind)
@@ -106,6 +110,8 @@ func CreateProcServer(kind ProcKind) (Proc, error) {
 		proc = NewSelfProcServer()
 	case ProcKind_LocalPF:
 		proc = NewLocalPFProcServer()
+	case ProcKind_RemotePF:
+		proc = NewRemotePFProcServer()
 	default:
 		return nil, fmt.Errorf("proc kind=[%v] not registered", kind)
 	}

@@ -153,9 +153,8 @@ func determineProcByArgs(args []string, tty bool) (kind worker.ProcKind, spec an
 	case "put":
 		spec, err := parseGetPutArgs(args)
 		return worker.ProcKind_Put, spec, err
-	case "localpf":
-		spec, err := parseLocalPFArgs(args)
-		return worker.ProcKind_LocalPF, spec, err
+	case "forward":
+		return parseForwardArgs(args, true)
 	case "socks5":
 	case "proxy":
 	case "self": // exit, remove
@@ -201,12 +200,23 @@ func parseSelfArgs(args []string) (worker.SelfSpec, error) {
 	return spec, nil
 }
 
-func parseLocalPFArgs(args []string) (worker.LocalPFSpec, error) {
-	spec := worker.LocalPFSpec{}
-	if len(args) != 2 {
-		return spec, fmt.Errorf("expect args <LocalEndpoint> <RemoteEndpoint>")
+func parseForwardArgs(args []string, isLocal bool) (kind worker.ProcKind, spec worker.ForwardSpec, err error) {
+	const usage = "expect args: {local|remote} <ListenEndpoint> <ConnectEndpoint>"
+	kind = worker.ProcKind_None
+	if len(args) != 3 {
+		err = fmt.Errorf(usage)
+		return
 	}
-	spec.LocalEndpoint = args[0]
-	spec.RemoteEndpoint = args[1]
-	return spec, nil
+	switch args[0] {
+	case "local":
+		kind = worker.ProcKind_LocalPF
+	case "remote":
+		kind = worker.ProcKind_RemotePF
+	default:
+		err = fmt.Errorf(usage)
+		return
+	}
+	spec.ListenEndpoint = args[1]
+	spec.ConnectEndpoint = args[2]
+	return
 }

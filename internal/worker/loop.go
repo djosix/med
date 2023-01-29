@@ -389,7 +389,7 @@ func (loop *LoopImpl) writer() {
 
 		err = loop.frameRW.WriteFrame(buf)
 		if err != nil {
-			logger.Error("write frame:", err)
+			logger.Debug("write frame:", err)
 			return
 		}
 	}

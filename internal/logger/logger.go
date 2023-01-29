@@ -1,11 +1,17 @@
 package logger
 
+import "fmt"
+
 type Logger string
 
 var RootLogger Logger = ""
 
 func NewLogger(name string) Logger {
 	return RootLogger.NewLogger(name)
+}
+
+func NewLoggerf(format string, a ...any) Logger {
+	return RootLogger.NewLogger(fmt.Sprintf(format, a...))
 }
 
 func (l Logger) NewLogger(name string) Logger {
