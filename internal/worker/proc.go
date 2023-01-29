@@ -79,6 +79,10 @@ func CreateProcClient(kind ProcKind, spec any) (Proc, error) {
 		if spec, ok := spec.(ForwardSpec); ok {
 			proc = NewRemotePFProcClient(spec)
 		}
+	case ProcKind_Socks:
+		if spec, ok := spec.(SocksSpec); ok {
+			proc = NewSocksProcClient(spec)
+		}
 	default:
 		return nil, fmt.Errorf("proc kind=%v not registered", kind)
 	}
@@ -112,6 +116,8 @@ func CreateProcServer(kind ProcKind) (Proc, error) {
 		proc = NewLocalPFProcServer()
 	case ProcKind_RemotePF:
 		proc = NewRemotePFProcServer()
+	case ProcKind_Socks:
+		proc = NewSocksProcServer()
 	default:
 		return nil, fmt.Errorf("proc kind=[%v] not registered", kind)
 	}

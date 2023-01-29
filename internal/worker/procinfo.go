@@ -11,7 +11,7 @@ const (
 	ProcKind_RemotePF ProcKind = "RemotePF"
 	ProcKind_Get      ProcKind = "Get"
 	ProcKind_Put      ProcKind = "Put"
-	ProcKind_Socks5   ProcKind = "Socks5"
+	ProcKind_Socks    ProcKind = "Socks"
 	ProcKind_Proxy    ProcKind = "Proxy"
 	ProcKind_Self     ProcKind = "Self"
 	ProcKind_WebUI    ProcKind = "WebUI"

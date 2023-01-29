@@ -179,6 +179,9 @@ func pfListen(
 	}
 
 	handleConn := func(idx uint64, conn net.Conn, inCh chan []byte) {
+		logger := logger.NewLoggerf("conn[%v]", idx)
+		logger.Debug("start")
+
 		dataOut(pfEncode(pfStateBegin, idx, nil))
 
 		cleanupOnce := sync.Once{}
@@ -194,6 +197,7 @@ func pfListen(
 		go func() {
 			defer wg.Done()
 			defer cleanup()
+			defer logger.Debug("pfReadLoop done")
 
 			pfReadLoop(conn, func(buf []byte) bool {
 				return dataOut(pfEncode(pfStateNone, idx, buf))
@@ -204,6 +208,7 @@ func pfListen(
 		go func() {
 			defer wg.Done()
 			defer cleanup()
+			defer logger.Debug("pfWriteLoop done")
 
 			pfWriteLoop(conn, func() []byte {
 				return <-inCh
@@ -260,7 +265,6 @@ func pfListen(
 			connsMu.Lock()
 			if inCh, ok := conns[idx]; ok {
 				switch state {
-				case pfStateBegin:
 				case pfStateNone:
 					inCh <- buf
 				case pfStateEnd:
@@ -268,13 +272,11 @@ func pfListen(
 				}
 			} else {
 				switch state {
-				case pfStateBegin:
 				case pfStateNone:
 					ok := dataOut(pfEncode(pfStateEnd, idx, nil))
 					if !ok {
 						return
 					}
-				case pfStateEnd:
 				}
 			}
 			connsMu.Unlock()
@@ -373,13 +375,10 @@ func pfConnect(
 			connsMu.Lock()
 			if inCh, ok := conns[idx]; ok {
 				switch state {
-				case pfStateBegin:
 				case pfStateNone:
 					inCh <- buf
 				case pfStateEnd:
 					go removeConn(idx)
-				default:
-					dataOut(pfEncode(pfStateEnd, idx, nil))
 				}
 			} else {
 				switch state {
@@ -394,7 +393,6 @@ func pfConnect(
 					}()
 				case pfStateNone:
 					dataOut(pfEncode(pfStateEnd, idx, nil))
-				case pfStateEnd:
 				}
 			}
 			connsMu.Unlock()

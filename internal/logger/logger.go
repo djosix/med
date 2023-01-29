@@ -11,7 +11,7 @@ func NewLogger(name string) Logger {
 }
 
 func NewLoggerf(format string, a ...any) Logger {
-	return RootLogger.NewLogger(fmt.Sprintf(format, a...))
+	return RootLogger.NewLoggerf(format, a...)
 }
 
 func (l Logger) NewLogger(name string) Logger {
@@ -20,6 +20,10 @@ func (l Logger) NewLogger(name string) Logger {
 	} else {
 		return Logger(l + "/" + Logger(name))
 	}
+}
+
+func (l Logger) NewLoggerf(format string, a ...any) Logger {
+	return l.NewLogger(fmt.Sprintf(format, a...))
 }
 
 func (l Logger) prependPrefixToString(s string) string {

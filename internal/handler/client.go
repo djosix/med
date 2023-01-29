@@ -153,6 +153,7 @@ func determineProcByArgs(args []string, tty bool) (kind worker.ProcKind, spec an
 		return parseForwardArgs(append([]string{cmd}, args...), true)
 	case "proxy":
 	case "socks":
+		return parseSocksArgs(args)
 	case "self":
 		spec, err := parseSelfArgs(args)
 		return worker.ProcKind_Self, spec, err
@@ -160,7 +161,7 @@ func determineProcByArgs(args []string, tty bool) (kind worker.ProcKind, spec an
 	case "tmux":
 	}
 
-	return worker.ProcKind_None, nil, fmt.Errorf("cannot determine root proc")
+	return worker.ProcKind_None, nil, fmt.Errorf("unknown command: %s", cmd)
 }
 
 func parseGetPutArgs(action string, args []string) (kind worker.ProcKind, spec worker.GetPutSpec, err error) {
@@ -221,5 +222,17 @@ func parseForwardArgs(args []string, isLocal bool) (kind worker.ProcKind, spec w
 	}
 	spec.ListenEndpoint = args[1]
 	spec.ConnectEndpoint = args[2]
+	return
+}
+
+func parseSocksArgs(args []string) (kind worker.ProcKind, spec worker.SocksSpec, err error) {
+	const usage = "expect args: <ListenEndpoint>"
+	if len(args) != 1 {
+		kind = worker.ProcKind_None
+		err = fmt.Errorf(usage)
+		return
+	}
+	kind = worker.ProcKind_Socks
+	spec.ListenEndpoint = args[0]
 	return
 }
