@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"reflect"
+	"runtime"
+	"strings"
 	"time"
 )
 
@@ -31,6 +34,7 @@ var (
 		"DEBUG",
 	}
 	logTimeLevel = true
+	logCaller    = true
 )
 
 func SetLevel(level LogLevel) {
@@ -72,6 +76,9 @@ func Log(level LogLevel, a ...any) (n int, err error) {
 	s := []any{}
 	if logTimeLevel {
 		s = append(s, fmt.Sprintf("%s [%5s]", getDateTime(), logLevelText[level]))
+	}
+	if logCaller {
+		// s = append(s, )
 	}
 	return Print(append(s, a...)...)
 }
@@ -149,3 +156,45 @@ func Fatalf(format string, a ...any) (n int, err error) {
 	}
 	return 0, nil
 }
+
+func GetFirstNonLoggerCaller() string {
+	pc := make([]uintptr, 8)
+	fmt.Println(runtime.Callers(1, pc))
+	frames := runtime.CallersFrames(pc)
+
+	for {
+		frame, more := frames.Next()
+
+		// var pkgName string
+		var funcLongName string
+		// var funcShortName string
+		{
+			i := strings.LastIndex(frame.Function, "/")
+			s := frame.Function[i+1:]
+			i = strings.Index(s, ".")
+			// pkgName = s[:i]
+			funcLongName = s[i+1:]
+			i = strings.LastIndex(s, ".")
+			// funcShortName = s[i+1:]
+		}
+
+		// fmt.Println(frame.Function, loggerPkgPath)
+		if strings.HasPrefix(frame.Function, loggerPkgPath) {
+			if !more {
+				break
+			}
+			continue
+		} else {
+			// fmt.Println(frame.Function)
+			return fmt.Sprintf("%v:%v %v", frame.File, frame.Line, funcLongName)
+		}
+
+		// fmt.Println(reflect.TypeOf(RootLogger).PkgPath())
+
+		// fmt.Printf("--------%v:%v pkg=%v func=%v %v\n", fileName, lineNo, pkgName, funcLongName, funcShortName)
+	}
+
+	return ""
+}
+
+var loggerPkgPath = reflect.TypeOf(RootLogger).PkgPath()

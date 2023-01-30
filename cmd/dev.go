@@ -18,15 +18,17 @@ var DevCmd = &cobra.Command{
 func devMain(cmd *cobra.Command, args []string) error {
 	_, _ = cmd, args
 
-	b := make([]byte, 1024)
-	fmt.Println(len(b))
-	fmt.Println(cap(b))
-	fmt.Println(len(b[100:]))
-	fmt.Println(cap(b[100:]))
-	fmt.Println(len(b[:200]))
-	fmt.Println(cap(b[:200]))
-	fmt.Println(len(b[100:200]))
-	fmt.Println(cap(b[100:200]))
+	fmt.Println(logger.GetFirstNonLoggerCaller())
+
+	// b := make([]byte, 1024)
+	// fmt.Println(len(b))
+	// fmt.Println(cap(b))
+	// fmt.Println(len(b[100:]))
+	// fmt.Println(cap(b[100:]))
+	// fmt.Println(len(b[:200]))
+	// fmt.Println(cap(b[:200]))
+	// fmt.Println(len(b[100:200]))
+	// fmt.Println(cap(b[100:200]))
 
 	// r.Cancel()
 	// r.Ctx, r.Cancel = context.WithCancel(ctx)
