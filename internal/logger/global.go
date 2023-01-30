@@ -88,70 +88,70 @@ func Logf(level LogLevel, format string, a ...any) (n int, err error) {
 }
 
 func Debug(a ...any) (n int, err error) {
-	if logLevel >= LevelDebug {
+	if maxLogLevel >= LevelDebug && logLevel >= LevelDebug {
 		return Log(LevelDebug, a...)
 	}
 	return 0, nil
 }
 
 func Debugf(format string, a ...any) (n int, err error) {
-	if logLevel >= LevelDebug {
+	if maxLogLevel >= LevelDebug && logLevel >= LevelDebug {
 		return Logf(LevelDebug, format, a...)
 	}
 	return 0, nil
 }
 
 func Info(a ...any) (n int, err error) {
-	if logLevel >= LevelInfo {
+	if maxLogLevel >= LevelInfo && logLevel >= LevelInfo {
 		return Log(LevelInfo, a...)
 	}
 	return 0, nil
 }
 
 func Infof(format string, a ...any) (n int, err error) {
-	if logLevel >= LevelInfo {
+	if maxLogLevel >= LevelInfo && logLevel >= LevelInfo {
 		return Logf(LevelInfo, format, a...)
 	}
 	return 0, nil
 }
 
 func Warn(a ...any) (n int, err error) {
-	if logLevel >= LevelWarn {
+	if maxLogLevel >= LevelWarn && logLevel >= LevelWarn {
 		return Log(LevelWarn, a...)
 	}
 	return 0, nil
 }
 
 func Warnf(format string, a ...any) (n int, err error) {
-	if logLevel >= LevelWarn {
+	if maxLogLevel >= LevelWarn && logLevel >= LevelWarn {
 		return Logf(LevelWarn, format, a...)
 	}
 	return 0, nil
 }
 
 func Error(a ...any) (n int, err error) {
-	if logLevel >= LevelError {
+	if maxLogLevel >= LevelError && logLevel >= LevelError {
 		return Log(LevelError, a...)
 	}
 	return 0, nil
 }
 
 func Errorf(format string, a ...any) (n int, err error) {
-	if logLevel >= LevelError {
+	if maxLogLevel >= LevelError && logLevel >= LevelError {
 		return Logf(LevelError, format, a...)
 	}
 	return 0, nil
 }
 
 func Fatal(a ...any) (n int, err error) {
-	if logLevel >= LevelFatal {
+	if maxLogLevel >= LevelFatal && logLevel >= LevelFatal {
 		return Log(LevelFatal, a...)
 	}
 	return 0, nil
 }
 
 func Fatalf(format string, a ...any) (n int, err error) {
-	if logLevel >= LevelFatal {
+	if maxLogLevel >= LevelFatal && logLevel >= LevelFatal {
 		return Logf(LevelFatal, format, a...)
 	}
 	return 0, nil

@@ -5,17 +5,18 @@ import (
 	"fmt"
 	"syscall"
 
+	"github.com/djosix/med/internal"
 	"golang.org/x/term"
 )
 
 func Hash256(data []byte) []byte {
-	salt := [4]byte{0x3a, 0x4d, 0x45, 0x44}
-	return HashSalt256(data, salt[:])
+	return HashSalt256(data, []byte{})
 }
 
 func HashSalt256(data []byte, salt []byte) []byte {
 	hasher := sha256.New()
 	hasher.Write(data)
+	hasher.Write(internal.Nonce)
 	hasher.Write(salt)
 	return hasher.Sum(nil)
 }

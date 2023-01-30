@@ -1,3 +1,3 @@
 package logger
 
-const maxLogLevel = LevelDebug
+const maxLogLevel = LevelFatal
