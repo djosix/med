@@ -3,20 +3,21 @@ package worker
 type ProcKind string
 
 const (
-	ProcKind_None     ProcKind = "None"
-	ProcKind_Example  ProcKind = "Example"
-	ProcKind_Main     ProcKind = "Main"
-	ProcKind_Exec     ProcKind = "Exec"
-	ProcKind_LocalPF  ProcKind = "LocalPF"
-	ProcKind_RemotePF ProcKind = "RemotePF"
-	ProcKind_Get      ProcKind = "Get"
-	ProcKind_Put      ProcKind = "Put"
-	ProcKind_Socks    ProcKind = "Socks"
-	ProcKind_Proxy    ProcKind = "Proxy"
-	ProcKind_Self     ProcKind = "Self"
-	ProcKind_WebUI    ProcKind = "WebUI"
-	ProcKind_CLI      ProcKind = "CLI"
-	ProcKind_TMUX     ProcKind = "TMUX"
+	ProcKind_None     ProcKind = "none"
+	ProcKind_Example  ProcKind = "example"
+	ProcKind_Main     ProcKind = "main"
+	ProcKind_Exec     ProcKind = "exec"
+	ProcKind_Get      ProcKind = "get"
+	ProcKind_Put      ProcKind = "put"
+	ProcKind_FTP      ProcKind = "ftp" // TODO
+	ProcKind_LocalPF  ProcKind = "forward-local"
+	ProcKind_RemotePF ProcKind = "forward-remote"
+	ProcKind_Socks    ProcKind = "socks"
+	ProcKind_Proxy    ProcKind = "proxy" // TODO
+	ProcKind_Self     ProcKind = "self"
+	ProcKind_WebUI    ProcKind = "webui" // TODO
+	ProcKind_CLI      ProcKind = "cli"   // TODO
+	ProcKind_TMUX     ProcKind = "tmux"  // TODO
 )
 
 type ProcSide byte

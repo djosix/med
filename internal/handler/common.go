@@ -62,8 +62,8 @@ func InitCommonFlags(cmd *cobra.Command) {
 	flags.StringArrayP(CommonFlagTrustPubPath, CommonFlagTrustPubPathP, []string{}, "trusted public key file path(s)")
 	flags.StringP(CommonFlagKeyHex, CommonFlagKeyHexP, "", "hex-encoded private key")
 	flags.StringP(CommonFlagKeyPath, CommonFlagKeyPathP, "", "private key file path")
-	flags.BoolP(CommonFlagUseRaw, CommonFlagUseRawP, false, "disable any encryption or compression.")
-	flags.IntP(CommonFlagVerbose, CommonFlagVerboseP, int(logger.LevelInfo), "verbosity, 0-5")
+	flags.BoolP(CommonFlagUseRaw, CommonFlagUseRawP, false, "disable any encryption or compression")
+	flags.IntP(CommonFlagVerbose, CommonFlagVerboseP, int(logger.LevelInfo), "verbosity, 0-"+fmt.Sprint(logger.MaxLogLevel))
 
 	cmd.MarkFlagsMutuallyExclusive(CommonFlagConnect, CommonFlagListen)
 	cmd.MarkFlagsMutuallyExclusive(CommonFlagPassword, CommonFlagPasswordPrompt)

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -14,7 +15,7 @@ import (
 )
 
 func Connect(ctx context.Context, endpoint string, handler Handler, connInt time.Duration) error {
-	logger := logger.NewLogger("Connect")
+	logger := logger.NewLogger("connect")
 	logger.Info("target", endpoint)
 
 	connect := func() error {
@@ -44,7 +45,7 @@ func Connect(ctx context.Context, endpoint string, handler Handler, connInt time
 }
 
 func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) error {
-	logger := logger.NewLogger("Listen")
+	logger := logger.NewLogger("listen")
 	logger.Info("bind on", endpoint)
 
 	var listener net.Listener
@@ -101,7 +102,7 @@ func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) 
 
 			ctx := context.WithValue(ctx, "conn", conn)
 			if err := handler(ctx, conn); err != nil {
-				logger.Errorf("handler for [%v] error [%v]", conn.RemoteAddr(), err)
+				logger.Errorf("handler addr=%#v error=%#v", fmt.Sprint(conn.RemoteAddr()), err.Error())
 			}
 		}()
 	}

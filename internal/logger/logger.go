@@ -42,50 +42,70 @@ func (l Logger) prependPrefixToAnySlice(a []any) []any {
 	return a
 }
 
-func (l Logger) Print(a ...any) (n int, err error) {
-	return Print(l.prependPrefixToAnySlice(a)...)
+func (l Logger) Print(a ...any) {
+	Print(l.prependPrefixToAnySlice(a)...)
 }
 
-func (l Logger) Printf(format string, a ...any) (n int, err error) {
-	return Printf(l.prependPrefixToString(format), a...)
+func (l Logger) Printf(format string, a ...any) {
+	Printf(l.prependPrefixToString(format), a...)
 }
 
-func (l Logger) Debug(a ...any) (n int, err error) {
-	return Debug(l.prependPrefixToAnySlice(a)...)
+func (l Logger) Debug(a ...any) {
+	if MaxLogLevel >= LevelDebug {
+		Debug(l.prependPrefixToAnySlice(a)...)
+	}
 }
 
-func (l Logger) Debugf(format string, a ...any) (n int, err error) {
-	return Debugf(l.prependPrefixToString(format), a...)
+func (l Logger) Debugf(format string, a ...any) {
+	if MaxLogLevel >= LevelDebug {
+		Debugf(l.prependPrefixToString(format), a...)
+	}
 }
 
-func (l Logger) Info(a ...any) (n int, err error) {
-	return Info(l.prependPrefixToAnySlice(a)...)
+func (l Logger) Info(a ...any) {
+	if MaxLogLevel >= LevelInfo {
+		Info(l.prependPrefixToAnySlice(a)...)
+	}
 }
 
-func (l Logger) Infof(format string, a ...any) (n int, err error) {
-	return Infof(l.prependPrefixToString(format), a...)
+func (l Logger) Infof(format string, a ...any) {
+	if MaxLogLevel >= LevelInfo {
+		Infof(l.prependPrefixToString(format), a...)
+	}
 }
 
-func (l Logger) Warn(a ...any) (n int, err error) {
-	return Warn(l.prependPrefixToAnySlice(a)...)
+func (l Logger) Warn(a ...any) {
+	if MaxLogLevel >= LevelWarn {
+		Warn(l.prependPrefixToAnySlice(a)...)
+	}
 }
 
-func (l Logger) Warnf(format string, a ...any) (n int, err error) {
-	return Warnf(l.prependPrefixToString(format), a...)
+func (l Logger) Warnf(format string, a ...any) {
+	if MaxLogLevel >= LevelWarn {
+		Warnf(l.prependPrefixToString(format), a...)
+	}
 }
 
-func (l Logger) Error(a ...any) (n int, err error) {
-	return Error(l.prependPrefixToAnySlice(a)...)
+func (l Logger) Error(a ...any) {
+	if MaxLogLevel >= LevelError {
+		Error(l.prependPrefixToAnySlice(a)...)
+	}
 }
 
-func (l Logger) Errorf(format string, a ...any) (n int, err error) {
-	return Errorf(l.prependPrefixToString(format), a...)
+func (l Logger) Errorf(format string, a ...any) {
+	if MaxLogLevel >= LevelError {
+		Errorf(l.prependPrefixToString(format), a...)
+	}
 }
 
-func (l Logger) Fatal(a ...any) (n int, err error) {
-	return Fatal(l.prependPrefixToAnySlice(a)...)
+func (l Logger) Fatal(a ...any) {
+	if MaxLogLevel >= LevelFatal {
+		Fatal(l.prependPrefixToAnySlice(a)...)
+	}
 }
 
-func (l Logger) Fatalf(format string, a ...any) (n int, err error) {
-	return Fatalf(l.prependPrefixToString(format), a...)
+func (l Logger) Fatalf(format string, a ...any) {
+	if MaxLogLevel >= LevelFatal {
+		Fatalf(l.prependPrefixToString(format), a...)
+	}
 }

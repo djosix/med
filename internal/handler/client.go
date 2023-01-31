@@ -58,19 +58,19 @@ func GetClientOpts(cmd *cobra.Command, args []string) (*ClientOpts, error) {
 }
 
 func ClientMain(cmd *cobra.Command, args []string) {
-	logger := logger.NewLogger("ClientMain")
+	logger := logger.NewLogger("client")
 	logger.Debug("start")
 	defer logger.Debug("done")
 
 	opts, err := GetClientOpts(cmd, args)
 	if err != nil {
-		logger.Error("GetClientOpts:", err)
+		logger.Error("options:", err)
 		return
 	}
 
 	err = ClientStart(cmd.Context(), opts)
 	if err != nil {
-		logger.Error("ClientStart:", err)
+		logger.Error(err)
 		return
 	}
 
@@ -79,16 +79,18 @@ func ClientMain(cmd *cobra.Command, args []string) {
 func ClientStart(ctx context.Context, opts *ClientOpts) error {
 	handler := ClientHandler
 	{
-		inits := []initializer.Initializer{
-			initializer.InitCheckMagic(initializer.ClientMagic, initializer.ServerMagic),
-			initializer.InitGetVerified(opts.PasswordHash),
-		}
+		// inits := []initializer.Initializer{
+		// 	initializer.InitCheckMagic(initializer.ClientMagic, initializer.ServerMagic),
+		// 	initializer.InitGetVerified(opts.PasswordHash),
+		// }
+		inits := []initializer.Initializer{}
 		if opts.SecretHash != nil {
 			inits = append(inits, initializer.InitEncryption(opts.SecretHash))
 		} else if !opts.UseRaw {
 			inits = append(inits, initializer.InitHandshake(opts.PrivateKey, opts.TrustedPublicKeys))
 			inits = append(inits, initializer.InitEncryption(nil))
 		}
+		inits = append(inits, initializer.InitGetVerified(opts.PasswordHash))
 		handler = BindInitializers(handler, inits...)
 	}
 
@@ -107,7 +109,7 @@ func ClientStart(ctx context.Context, opts *ClientOpts) error {
 }
 
 func ClientHandler(ctx context.Context, rwc io.ReadWriteCloser) error {
-	logger := logger.NewLogger("ClientHandler")
+	logger := logger.NewLogger("client/handler")
 	logger.Debug("start")
 	defer logger.Debug("done")
 

@@ -45,19 +45,19 @@ func GetServerOpts(cmd *cobra.Command, args []string) (*ServerOpts, error) {
 }
 
 func ServerMain(cmd *cobra.Command, args []string) {
-	logger := logger.NewLogger("ServerMain")
+	logger := logger.NewLogger("server")
 	logger.Debug("start")
 	defer logger.Debug("done")
 
 	opts, err := GetServerOpts(cmd, args)
 	if err != nil {
-		logger.Error("GetServerOpts:", err)
+		logger.Error("options:", err)
 		return
 	}
 
 	err = ServerStart(cmd.Context(), opts)
 	if err != nil {
-		logger.Error("ServerStart:", err)
+		logger.Error(err)
 		return
 	}
 
@@ -66,16 +66,18 @@ func ServerMain(cmd *cobra.Command, args []string) {
 func ServerStart(ctx context.Context, opts *ServerOpts) error {
 	handler := ServerHandler
 	{
-		inits := []initializer.Initializer{
-			initializer.InitCheckMagic(initializer.ServerMagic, initializer.ClientMagic),
-			initializer.InitVerify(opts.PasswordHash),
-		}
+		// inits := []initializer.Initializer{
+		// 	initializer.InitCheckMagic(initializer.ServerMagic, initializer.ClientMagic),
+		// 	initializer.InitVerify(opts.PasswordHash),
+		// }
+		inits := []initializer.Initializer{}
 		if opts.SecretHash != nil {
 			inits = append(inits, initializer.InitEncryption(opts.SecretHash))
 		} else if !opts.UseRaw {
 			inits = append(inits, initializer.InitHandshake(opts.PrivateKey, opts.TrustedPublicKeys))
 			inits = append(inits, initializer.InitEncryption(nil))
 		}
+		inits = append(inits, initializer.InitVerify(opts.PasswordHash))
 		handler = BindInitializers(handler, inits...)
 	}
 
@@ -92,7 +94,7 @@ func ServerStart(ctx context.Context, opts *ServerOpts) error {
 }
 
 func ServerHandler(ctx context.Context, rwc io.ReadWriteCloser) error {
-	logger := logger.NewLogger("ServerHandler")
+	logger := logger.NewLogger("server/handler")
 	logger.Debug("start")
 	defer logger.Debug("done")
 

@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/djosix/med/internal/logger"
 	"github.com/spf13/cobra"
 )
@@ -18,7 +16,25 @@ var DevCmd = &cobra.Command{
 func devMain(cmd *cobra.Command, args []string) error {
 	_, _ = cmd, args
 
-	fmt.Println(logger.GetFirstNonLoggerCaller())
+	logger.Log(1, "test")
+
+	// wg := helper.NewNamedWaitGroup()
+	// wg.Go("sleep 1", func() {
+	// 	time.Sleep(1 * time.Second)
+	// })
+	// wg.Go("sleep 2", func() {
+	// 	time.Sleep(2 * time.Second)
+	// })
+	// wg.Go("sleep 3", func() {
+	// 	time.Sleep(3 * time.Second)
+	// })
+
+	// fmt.Println("wait")
+	// for wg.WaitOne() {
+	// 	fmt.Println(wg.ActiveNames())
+	// }
+
+	// for
 
 	// b := make([]byte, 1024)
 	// fmt.Println(len(b))
