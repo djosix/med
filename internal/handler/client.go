@@ -80,7 +80,7 @@ func ClientStart(ctx context.Context, opts *ClientOpts) error {
 	handler := ClientHandler
 	{
 		// inits := []initializer.Initializer{
-		// 	initializer.InitCheckMagic(initializer.ClientMagic, initializer.ServerMagic),
+		//	initializer.InitCheckMagic(initializer.ClientMagic, initializer.ServerMagic),
 		// 	initializer.InitGetVerified(opts.PasswordHash),
 		// }
 		inits := []initializer.Initializer{}
@@ -90,7 +90,7 @@ func ClientStart(ctx context.Context, opts *ClientOpts) error {
 			inits = append(inits, initializer.InitHandshake(opts.PrivateKey, opts.TrustedPublicKeys))
 			inits = append(inits, initializer.InitEncryption(nil))
 		}
-		inits = append(inits, initializer.InitGetVerified(opts.PasswordHash))
+		inits = append(inits, initializer.InitGetAuthenticated(opts.PasswordHash))
 		handler = BindInitializers(handler, inits...)
 	}
 

@@ -11,6 +11,16 @@ import (
 	"github.com/djosix/med/internal/readwriter"
 )
 
+// type MedMode int
+
+// const (
+// 	MedMode
+// )
+
+// type MedInfo struct {
+// 	Mode
+// }
+
 func InitCheckMagic(sendMagic, recvMagic []byte) Initializer {
 	return func(ctx context.Context, rwc io.ReadWriteCloser) (ctxOut context.Context, rwcOut io.ReadWriteCloser, err error) {
 		initLogger.Debug("CheckMagic")
@@ -36,12 +46,6 @@ var (
 	ServerMagic = helper.HashSalt256(internal.Nonce, []byte("ServerMagic"))
 	ClientMagic = helper.HashSalt256(internal.Nonce, []byte("ClientMagic"))
 )
-
-// func MakeMagic() []byte {
-// 	randBytes := make([]byte, 4)
-// 	rand.Read(randBytes[:])
-
-// }
 
 func CheckMagic(rw io.ReadWriter, sendMagic, recvMagic []byte) error {
 	rw = readwriter.NewFullReadWriter(rw)

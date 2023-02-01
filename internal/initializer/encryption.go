@@ -14,7 +14,7 @@ import (
 
 func InitEncryption(secret []byte) Initializer {
 	return func(ctx context.Context, rwc io.ReadWriteCloser) (ctxOut context.Context, rwcOut io.ReadWriteCloser, err error) {
-		initLogger.Debug("Encryption")
+		initLogger.Debug("encryption")
 
 		secret := secret
 		if secret == nil {

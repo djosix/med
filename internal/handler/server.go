@@ -77,7 +77,7 @@ func ServerStart(ctx context.Context, opts *ServerOpts) error {
 			inits = append(inits, initializer.InitHandshake(opts.PrivateKey, opts.TrustedPublicKeys))
 			inits = append(inits, initializer.InitEncryption(nil))
 		}
-		inits = append(inits, initializer.InitVerify(opts.PasswordHash))
+		inits = append(inits, initializer.InitAuthenticate(opts.PasswordHash))
 		handler = BindInitializers(handler, inits...)
 	}
 

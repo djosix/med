@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	loopLogger = logger.NewLogger("Loop")
+	loopLogger = logger.NewLogger("loop")
 
 	ErrLoopClosed = fmt.Errorf("loop closed")
 )
@@ -108,7 +108,7 @@ func (loop *LoopImpl) Run() {
 	loop.runLock.Lock()
 	defer loop.runLock.Unlock()
 
-	logger := loopLogger.NewLogger("Run")
+	logger := loopLogger.NewLogger("run")
 	logger.Debug("start")
 	defer logger.Debug("done")
 

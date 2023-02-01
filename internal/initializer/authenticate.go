@@ -11,25 +11,25 @@ import (
 	"github.com/djosix/med/internal/readwriter"
 )
 
-func InitVerify(hash []byte) Initializer {
+func InitAuthenticate(hash []byte) Initializer {
 	return func(ctx context.Context, rwc io.ReadWriteCloser) (ctxOut context.Context, rwcOut io.ReadWriteCloser, err error) {
-		initLogger.Debug("Verify")
+		initLogger.Debug("authenticate")
 
 		ctxOut = ctx
 		rwcOut = rwc
-		err = Verify(rwc, hash)
+		err = Authenticate(rwc, hash)
 
 		return
 	}
 }
 
-func InitGetVerified(hash []byte) Initializer {
+func InitGetAuthenticated(hash []byte) Initializer {
 	return func(ctx context.Context, rwc io.ReadWriteCloser) (ctxOut context.Context, rwcOut io.ReadWriteCloser, err error) {
-		initLogger.Debug("GetVerified")
+		initLogger.Debug("get authenticated")
 
 		ctxOut = ctx
 		rwcOut = rwc
-		err = GetVerified(rwc, hash)
+		err = GetAuthenticated(rwc, hash)
 
 		return
 	}
@@ -48,7 +48,7 @@ func getVerifier(hash []byte, salt []byte) []byte {
 	return helper.Hash256(buf)
 }
 
-func Verify(rw io.ReadWriter, hash []byte) (err error) {
+func Authenticate(rw io.ReadWriter, hash []byte) (err error) {
 	f := readwriter.NewOrderedFramReadWriter(readwriter.NewPlainFrameReadWriter(rw))
 
 	// hash is empty, directly send ServerAccept
@@ -83,7 +83,7 @@ func Verify(rw io.ReadWriter, hash []byte) (err error) {
 	return f.WriteFrame([]byte{StatusAccept})
 }
 
-func GetVerified(rw io.ReadWriter, hash []byte) error {
+func GetAuthenticated(rw io.ReadWriter, hash []byte) error {
 	rejectErr := fmt.Errorf("server rejected")
 	statusErr := fmt.Errorf("unexpected status")
 
