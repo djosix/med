@@ -4,6 +4,7 @@ TODO
 - debug ctx.OutputPacket panic because channel closed
 - debug socks proc performance
 - debug socks proc client ctrl+c hanging
+- refactor loop
 - implement procs
     - get /remote/path [/local/path] tar and gz mode
     - put /local/path [/remote/path] tar and gz mode
