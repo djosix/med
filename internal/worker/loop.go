@@ -24,8 +24,8 @@ type Loop interface {
 	Start(h Proc) (procID uint32, doneCh <-chan struct{}) // Start a Proc
 	StartLater(p Proc) (
 		procID uint32,
-		handle func(bool) (doneCh <-chan struct{},
-		)) // Start a Proc later
+		handle func(bool) (doneCh <-chan struct{}),
+	) // Start a Proc later
 	Remove(id uint32) bool // Remove a Proc
 	Done() <-chan struct{} // Get the done chan of loop ctx
 	Stop()                 // Stop the loop
@@ -122,7 +122,10 @@ func (loop *LoopImpl) Run() {
 	}
 
 	<-loop.ctx.Done()
+	logger.Debug("ctx done")
+
 	<-loop.dispatchDone
+	logger.Debug("remove all procs")
 	for procID := range loop.procData {
 		loop.Remove(procID)
 	}
@@ -183,11 +186,11 @@ func (loop *LoopImpl) StartLater(proc Proc) (procID uint32, handle func(bool) <-
 			pkt.SourceID = procID
 			pkt.TargetID = procID
 
-			loop.packetOutputCh <- pkt
-			// ok := loop.putPacketToChannel(pkt, loop.pktOutCh)
-			// if !ok {
-			// 	return
-			// }
+			select {
+			case loop.packetOutputCh <- pkt:
+			case <-loop.writeDone:
+				return
+			}
 		}
 	}
 
@@ -212,10 +215,11 @@ func (loop *LoopImpl) StartLater(proc Proc) (procID uint32, handle func(bool) <-
 			ProcID:           procID,
 		}
 		proc.Run(&runCtx)
-
+		logger.Debug("proc.Run(&runCtx)")
 		close(pktOutCh)
-
+		logger.Debug("close(pktOutCh)")
 		<-sendDone
+		logger.Debug("<-sendDone")
 		loop.Remove(procID)
 	}
 

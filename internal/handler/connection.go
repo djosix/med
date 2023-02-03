@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/djosix/med/internal/helper"
@@ -64,15 +63,9 @@ func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) 
 	defer listener.Close()
 
 	// Graceful shutdown
-	{
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithCancel(ctx)
-
-		handleSignal(func() {
-			cancel()
-			listener.Close()
-		}, syscall.SIGINT, syscall.SIGTERM)
-	}
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(ctx)
+	handleSignal(func() { cancel(); listener.Close() }, os.Interrupt)
 
 	gate := helper.NewGate(ctx, maxConn)
 	wg := sync.WaitGroup{}

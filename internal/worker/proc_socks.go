@@ -72,8 +72,7 @@ func (p *SocksProcServer) Run(ctx *ProcRunCtx) {
 	l.Wait()
 }
 
-//
-
+// MedSocksListener provides net.Listener interface for socks5.Serve
 type MedSocksListener struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
@@ -84,10 +83,7 @@ type MedSocksListener struct {
 }
 
 func NewMedSocksListener(
-	ctx context.Context,
-	dataIn func(ctx context.Context) []byte,
-	dataOut func(data []byte) bool,
-) *MedSocksListener {
+	ctx context.Context, dataIn pfDataInFn, dataOut pfDataOutFn) *MedSocksListener {
 
 	ctx, cancel := context.WithCancel(ctx)
 
@@ -96,14 +92,17 @@ func NewMedSocksListener(
 		cancel:    cancel,
 		newConnCh: make(chan *MedSocksConn, 0),
 		dataOut:   dataOut,
+		wg:        sync.WaitGroup{},
 	}
 
 	l.wg.Add(1)
 	go func() {
-		defer logger.Debug("listener closed")
-		defer close(l.newConnCh)
-		defer l.cancel()
-		defer l.wg.Done()
+		defer func() {
+			logger.Debug("listener closed")
+			close(l.newConnCh)
+			l.cancel()
+			l.wg.Done()
+		}()
 
 		for {
 			data := dataIn(ctx)
@@ -120,19 +119,19 @@ func NewMedSocksListener(
 				conn := connAny.(*MedSocksConn)
 				switch state {
 				case pfStateNone:
-					logger.Debug("dataIn conn.inCh <- data")
+					// logger.Debug("dataIn conn.inCh <- data")
 					conn.inCh <- data
 				case pfStateEnd:
-					logger.Debug("dataIn conn.Close()")
+					// logger.Debug("dataIn conn.Close()")
 					conn.Close()
 				}
 			} else {
 				switch state {
 				case pfStateBegin:
-					logger.Debug("dataIn l.newConnCh <- l.createConn(idx)")
+					// logger.Debug("dataIn l.newConnCh <- l.createConn(idx)")
 					l.newConnCh <- l.createConn(idx)
 				case pfStateNone:
-					logger.Debug("dataIn resp end")
+					// logger.Debug("dataIn resp end")
 					dataOut(pfEncode(pfStateEnd, idx, nil))
 				}
 			}
@@ -163,11 +162,11 @@ func (l *MedSocksListener) createConn(idx uint64) *MedSocksConn {
 
 	l.wg.Add(1)
 	go func() {
-		logger.Debug("conn start")
-		defer logger.Debug("conn end")
-		defer l.dataOut(pfEncode(pfStateEnd, idx, nil))
-		defer l.removeConn(idx)
-		defer l.wg.Done()
+		defer func() {
+			l.dataOut(pfEncode(pfStateEnd, idx, nil))
+			l.removeConn(idx)
+			l.wg.Done()
+		}()
 		for {
 			select {
 			case data := <-conn.outCh:
@@ -185,9 +184,7 @@ func (l *MedSocksListener) createConn(idx uint64) *MedSocksConn {
 }
 
 func (l *MedSocksListener) removeConn(idx uint64) {
-	logger.Debug("removeConn1:", idx)
 	if value, ok := l.conns.LoadAndDelete(idx); ok {
-		logger.Debug("removeConn:", idx)
 		conn := value.(*MedSocksConn)
 		close(conn.inCh)
 		conn.Close()
@@ -199,7 +196,7 @@ func (l *MedSocksListener) Wait() {
 }
 
 func (l *MedSocksListener) Close() error {
-	logger.Debug("conn.Close")
+	logger.Debug("MedSocksListener.Close")
 
 	l.conns.Range(func(key, _ any) bool {
 		l.removeConn(key.(uint64))

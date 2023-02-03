@@ -283,6 +283,13 @@ func pfListen(
 		}
 	}()
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		<-ctx.Done()
+		listener.Close()
+	}()
+
 	wg.Wait()
 
 	return nil
@@ -477,7 +484,9 @@ func pfDecode(data []byte) (state pfState, idx uint64, buf []byte, err error) {
 	return
 }
 
-func pfDefaultDataInFn(ctx *ProcRunCtx) func(c context.Context) []byte {
+type pfDataInFn = func(ctx context.Context) []byte
+
+func pfDefaultDataInFn(ctx *ProcRunCtx) pfDataInFn {
 	return func(c context.Context) []byte {
 		for {
 			pkt := ctx.InputPacketWithDone(c.Done())
@@ -492,7 +501,9 @@ func pfDefaultDataInFn(ctx *ProcRunCtx) func(c context.Context) []byte {
 	}
 }
 
-func pfDefaultDataOutFn(ctx *ProcRunCtx) func(data []byte) bool {
+type pfDataOutFn = func(data []byte) bool
+
+func pfDefaultDataOutFn(ctx *ProcRunCtx) pfDataOutFn {
 	return func(data []byte) bool {
 		// logger.Debug("dataOut:", data)
 		pkt := helper.NewDataPacket(data)
