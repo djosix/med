@@ -88,7 +88,7 @@ func CreateProcClient(kind ProcKind, spec any) (Proc, error) {
 	}
 
 	if proc == nil {
-		return nil, fmt.Errorf("proc kind=[%v] is nil", kind)
+		return nil, fmt.Errorf("proc kind=%v is nil", kind)
 	}
 
 	if proc.Side()&ProcSide_Client == 0 {
@@ -119,11 +119,11 @@ func CreateProcServer(kind ProcKind) (Proc, error) {
 	case ProcKind_Socks:
 		proc = NewSocksProcServer()
 	default:
-		return nil, fmt.Errorf("proc kind=[%v] not registered", kind)
+		return nil, fmt.Errorf("proc kind=%v not registered", kind)
 	}
 
 	if proc == nil {
-		return nil, fmt.Errorf("proc kind=[%v] is nil", kind)
+		return nil, fmt.Errorf("proc kind=%v is nil", kind)
 	}
 
 	if proc.Side()&ProcSide_Server == 0 {

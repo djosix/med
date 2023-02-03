@@ -149,7 +149,7 @@ func (p *RemotePFProcServer) Run(ctx *ProcRunCtx) {
 //
 
 func pfListen(ctx context.Context, endpoint string, dataIn pfDataInFn, dataOut pfDataOutFn) error {
-	logger := logger.NewLoggerf("pfListen[%v]", endpoint)
+	logger := logger.NewLoggerf("pfListen@%v", endpoint)
 
 	listener, err := net.Listen(helper.SplitEndpoint(endpoint))
 	if err != nil {
@@ -179,7 +179,7 @@ func pfListen(ctx context.Context, endpoint string, dataIn pfDataInFn, dataOut p
 	}
 
 	handleConn := func(idx uint64, conn net.Conn, inCh chan []byte) {
-		logger := logger.NewLoggerf("conn[%v]", idx)
+		logger := logger.NewLoggerf("conn-%v", idx)
 		logger.Debug("start")
 
 		dataOut(pfEncode(pfStateBegin, idx, nil))

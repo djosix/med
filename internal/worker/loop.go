@@ -259,7 +259,7 @@ func (loop *LoopImpl) StartLater(proc Proc) (procID uint32, handle func(bool) <-
 
 	handle = func(ok bool) <-chan struct{} {
 		if !ok {
-			logger.Debugf("cancel handle for proc[%v]", procID)
+			logger.Debugf("cancel handle for proc-%v", procID)
 			loop.Remove(procID)
 			return nil
 		}
@@ -383,7 +383,7 @@ func (loop *LoopImpl) dispatcher() {
 
 		// Handle error packet
 		if pkt.Kind == pb.PacketKind_PacketKindError {
-			logger.Errorf("remote proc[%v] error: %v", pkt.SourceID, string(pkt.Data))
+			logger.Errorf("remote proc-%v error: %v", pkt.SourceID, string(pkt.Data))
 			logger.Debug("got error packet [%v]", pkt.String())
 			if pkt.SourceID == 0 || pkt.SourceID == pkt.TargetID {
 				loop.Remove(pkt.TargetID)
@@ -434,7 +434,7 @@ func (loop *LoopImpl) dispatchToProc(pkt *pb.Packet) error {
 	// logger.Debugf("packet: [%v]", pkt)
 	pd, ok := loop.procData[pkt.TargetID]
 	if !ok {
-		return fmt.Errorf("proc[%v] not found", pkt.TargetID)
+		return fmt.Errorf("proc-%v not found", pkt.TargetID)
 	}
 
 	select {

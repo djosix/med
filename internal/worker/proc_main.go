@@ -127,10 +127,10 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 			delete(pendingProcs, msg.SeqNo)
 
 			if data.Error != "" {
-				logger.Errorf("start proc[%v] remote: %v", pp.procID, data.Error)
+				logger.Errorf("start proc-%v remote: %v", pp.procID, data.Error)
 				pp.handle(false) // cancel start
 			} else {
-				logger.Debugf("start proc[%v]", pp.procID)
+				logger.Debugf("start proc-%v", pp.procID)
 				doneCh := pp.handle(true)
 
 				atomic.AddInt32(&procCount, 1)
@@ -247,7 +247,7 @@ func (p *MainProcServer) Run(ctx *ProcRunCtx) {
 			return fmt.Errorf("invalid new procID: required=%v got=%v", data.ProcID, startProcID)
 		}
 
-		logger.Debugf("start proc[%v] kind=%v", startProcID, data.ProcKind)
+		logger.Debugf("start proc-%v kind=%v", startProcID, data.ProcKind)
 		doneCh := startHandle(true)
 
 		// Subscribe proc exit
@@ -264,10 +264,10 @@ func (p *MainProcServer) Run(ctx *ProcRunCtx) {
 
 	handleRemove := func(data *MainProcMsg_Remove) error {
 		if ok := ctx.Loop.Remove(data.ProcID); !ok {
-			logger.Errorf("proc[%v] not removed", data.ProcID)
+			logger.Errorf("proc-%v not removed", data.ProcID)
 			return fmt.Errorf("not removed")
 		}
-		logger.Debugf("removed proc[%v]", data.ProcID)
+		logger.Debugf("removed proc-%v-", data.ProcID)
 		return nil
 	}
 
