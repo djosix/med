@@ -14,20 +14,20 @@ type Proc interface {
 }
 
 type ProcRunCtx struct {
-	context.Context                     // proc ctx
-	Cancel           context.CancelFunc // cancel proc ctx
-	Loop             Loop               // the loop running proc
-	ProcID           uint32
-	PacketOutputCh   chan<- *pb.Packet // packet output channel
-	packetOutputDone <-chan struct{}
-	PacketInputCh    <-chan *pb.Packet // packet input channel
+	context.Context                    // proc ctx
+	Cancel          context.CancelFunc // cancel proc ctx
+	Loop            Loop               // the loop running proc
+	ProcID          uint32
+	PktOutCh        chan<- *pb.Packet // packet output channel
+	PktOutDone      <-chan struct{}
+	PktInCh         <-chan *pb.Packet // packet input channel
 }
 
 func (ctx *ProcRunCtx) OutputPacket(pkt *pb.Packet) bool {
 	select {
-	case ctx.PacketOutputCh <- pkt:
+	case ctx.PktOutCh <- pkt:
 		return true
-	case <-ctx.packetOutputDone:
+	case <-ctx.PktOutDone:
 		return false
 	}
 }
@@ -38,7 +38,7 @@ func (ctx *ProcRunCtx) InputPacket() *pb.Packet {
 
 func (ctx *ProcRunCtx) InputPacketWithDone(doneCh <-chan struct{}) *pb.Packet {
 	select {
-	case pkt := <-ctx.PacketInputCh:
+	case pkt := <-ctx.PktInCh:
 		return pkt
 	case <-doneCh:
 		return nil

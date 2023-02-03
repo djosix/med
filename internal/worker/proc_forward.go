@@ -148,12 +148,7 @@ func (p *RemotePFProcServer) Run(ctx *ProcRunCtx) {
 
 //
 
-func pfListen(
-	ctx context.Context,
-	endpoint string,
-	dataIn func(context.Context) []byte,
-	dataOut func([]byte) bool,
-) error {
+func pfListen(ctx context.Context, endpoint string, dataIn pfDataInFn, dataOut pfDataOutFn) error {
 	logger := logger.NewLoggerf("pfListen[%v]", endpoint)
 
 	listener, err := net.Listen(helper.SplitEndpoint(endpoint))
@@ -165,15 +160,20 @@ func pfListen(
 	ctx, cancel := context.WithCancel(ctx)
 	wg := sync.WaitGroup{}
 
-	conns := map[uint64]chan []byte{}
-	connsMu := sync.Mutex{}
+	type connData struct {
+		inCh      chan<- []byte
+		closeInCh func()
+	}
+	conns := map[uint64]connData{}
+	connMu := sync.Mutex{}
+	connWg := sync.WaitGroup{}
 
 	removeConn := func(idx uint64) {
-		connsMu.Lock()
-		defer connsMu.Unlock()
+		connMu.Lock()
+		defer connMu.Unlock()
 
-		if inCh, ok := conns[idx]; ok {
-			close(inCh)
+		if cd, ok := conns[idx]; ok {
+			cd.closeInCh()
 			delete(conns, idx)
 		}
 	}
@@ -193,23 +193,25 @@ func pfListen(
 			})
 		}
 
-		wg.Add(1)
+		connWg.Add(1)
 		go func() {
-			defer wg.Done()
-			defer cleanup()
-			defer logger.Debug("pfReadLoop done")
-
+			defer func() {
+				cleanup()
+				connWg.Done()
+				logger.Debug("pfReadLoop done")
+			}()
 			pfReadLoop(conn, func(buf []byte) bool {
 				return dataOut(pfEncode(pfStateNone, idx, buf))
 			})
 		}()
 
-		wg.Add(1)
+		connWg.Add(1)
 		go func() {
-			defer wg.Done()
-			defer cleanup()
-			defer logger.Debug("pfWriteLoop done")
-
+			defer func() {
+				cleanup()
+				connWg.Done()
+				logger.Debug("pfWriteLoop done")
+			}()
 			pfWriteLoop(conn, func() []byte {
 				return <-inCh
 			})
@@ -232,9 +234,14 @@ func pfListen(
 			logger.Debug("accept:", conn.RemoteAddr())
 
 			inCh := make(chan []byte)
-			connsMu.Lock()
-			conns[idx] = inCh
-			connsMu.Unlock()
+			once := sync.Once{}
+
+			connMu.Lock()
+			conns[idx] = connData{
+				inCh:      inCh,
+				closeInCh: func() { once.Do(func() { close(inCh) }) },
+			}
+			connMu.Unlock()
 
 			wg.Add(1)
 			go func() {
@@ -262,24 +269,23 @@ func pfListen(
 				continue
 			}
 
-			connsMu.Lock()
-			if inCh, ok := conns[idx]; ok {
+			connMu.Lock()
+			if c, ok := conns[idx]; ok {
 				switch state {
 				case pfStateNone:
-					inCh <- buf
+					c.inCh <- buf
 				case pfStateEnd:
 					go removeConn(idx)
 				}
 			} else {
 				switch state {
 				case pfStateNone:
-					ok := dataOut(pfEncode(pfStateEnd, idx, nil))
-					if !ok {
+					if ok := dataOut(pfEncode(pfStateEnd, idx, nil)); !ok {
 						return
 					}
 				}
 			}
-			connsMu.Unlock()
+			connMu.Unlock()
 		}
 	}()
 
@@ -291,6 +297,13 @@ func pfListen(
 	}()
 
 	wg.Wait()
+
+	connMu.Lock()
+	for _, c := range conns {
+		c.closeInCh()
+	}
+	connMu.Unlock()
+	connWg.Wait()
 
 	return nil
 }

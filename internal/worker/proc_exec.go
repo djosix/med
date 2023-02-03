@@ -3,7 +3,6 @@ package worker
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -236,7 +235,7 @@ func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
 	wg := sync.WaitGroup{}
 
 	startReader := func(file *os.File) <-chan []byte {
-		logger := logger.NewLogger(fmt.Sprintf("reader[fd=%v]", file.Fd()))
+		logger := logger.NewLoggerf("reader[fd=%v]", file.Fd())
 		ch := make(chan []byte)
 
 		wg.Add(1)
@@ -264,7 +263,7 @@ func (p *ExecProcServer) Run(ctx *ProcRunCtx) {
 	}
 
 	startSender := func(fd byte, ch <-chan []byte) {
-		logger := logger.NewLogger(fmt.Sprintf("sender[fd=%v]", fd))
+		logger := logger.NewLoggerf("sender[fd=%v]", fd)
 
 		wg.Add(1)
 		go func() {

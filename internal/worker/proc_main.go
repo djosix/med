@@ -89,7 +89,7 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 		pendingProcs[seqNo] = pendingProc{procID: procID, handle: handle}
 
 		// Notify server to create a proc
-		ctx.PacketOutputCh <- helper.NewDataPacket(helper.MustEncode(&MainProcMsg{
+		ctx.PktOutCh <- helper.NewDataPacket(helper.MustEncode(&MainProcMsg{
 			Kind: MainProcMsgKind_Start, SeqNo: seqNo,
 			Data: helper.MustEncode(&MainProcMsg_Start{ProcKind: procKind, ProcID: procID}),
 		}))
@@ -102,7 +102,7 @@ func (p *MainProcClient) Run(ctx *ProcRunCtx) {
 
 	removeProc := func(procID uint32) {
 		seqNo := atomic.AddUint32(&seqNo, 1)
-		ctx.PacketOutputCh <- helper.NewDataPacket(helper.MustEncode(&MainProcMsg{
+		ctx.PktOutCh <- helper.NewDataPacket(helper.MustEncode(&MainProcMsg{
 			Kind: MainProcMsgKind_Remove, SeqNo: seqNo,
 			Data: helper.MustEncode(&MainProcMsg_Remove{ProcID: procID}),
 		}))
@@ -306,7 +306,7 @@ func (p *MainProcServer) Run(ctx *ProcRunCtx) {
 		if dataToReturn != nil {
 			msg := *msg // clone
 			msg.Data = dataToReturn
-			ctx.PacketOutputCh <- &pb.Packet{
+			ctx.PktOutCh <- &pb.Packet{
 				Kind: pb.PacketKind_PacketKindData,
 				Data: helper.MustEncode(msg),
 			}
@@ -318,7 +318,7 @@ forLoop:
 		// Get new packet
 		var pkt *pb.Packet
 		select {
-		case pkt = <-ctx.PacketInputCh:
+		case pkt = <-ctx.PktInCh:
 			if pkt == nil {
 				return // channel closed
 			}

@@ -41,8 +41,10 @@ type LoopImpl struct {
 
 	runLock sync.Mutex
 
-	packetInputCh   chan *pb.Packet
-	packetOutputCh  chan *pb.Packet // will have multiple senders so never close it
+	pktInCh    chan *pb.Packet // sender: reader
+	pktOutCh   chan *pb.Packet // sender: dispatcher, processor's senders
+	pktOutChWg sync.WaitGroup  // sender wait group
+
 	frameRW         readwriter.FrameReadWriter
 	closer          io.Closer
 	dispatchTimeout time.Duration
@@ -57,11 +59,11 @@ type LoopImpl struct {
 }
 
 type loopProcData struct {
-	proc             Proc
-	ctx              context.Context
-	cancel           context.CancelFunc
-	pktInCh          chan *pb.Packet
-	closePktInChOnce sync.Once
+	proc         Proc
+	ctx          context.Context
+	cancel       context.CancelFunc
+	pktInCh      chan *pb.Packet
+	closePktInCh func()
 }
 
 // func (pd *loopProcData) closeInput() {
@@ -88,8 +90,8 @@ func NewLoop(ctx context.Context, rwc io.ReadWriteCloser) *LoopImpl {
 
 		runLock: sync.Mutex{},
 
-		packetInputCh:   make(chan *pb.Packet, 0),
-		packetOutputCh:  make(chan *pb.Packet, 0),
+		pktInCh:         make(chan *pb.Packet, 0),
+		pktOutCh:        make(chan *pb.Packet, 0),
 		frameRW:         frameRw,
 		closer:          rwc,
 		dispatchTimeout: time.Duration(1) * time.Second,
@@ -98,6 +100,8 @@ func NewLoop(ctx context.Context, rwc io.ReadWriteCloser) *LoopImpl {
 		ctx:      loopCtx,
 		cancel:   loopCancel,
 		stopOnce: sync.Once{},
+
+		pktOutChWg: sync.WaitGroup{},
 
 		writeDone:    make(chan struct{}),
 		dispatchDone: make(chan struct{}),
@@ -112,17 +116,35 @@ func (loop *LoopImpl) Run() {
 	logger.Debug("start")
 	defer logger.Debug("done")
 
-	for _, loopFunc := range []func(){loop.reader, loop.dispatcher, loop.writer} {
-		loopFunc := loopFunc
-		loop.wg.Add(1)
-		go func() {
-			defer loop.wg.Done()
-			loopFunc()
-		}()
+	if !loop.isActive() {
+		logger.Error("cannot run a closed loop")
+		return
 	}
 
+	loop.wgGo(func() {
+		defer close(loop.pktInCh)
+		loop.reader()
+	})
+
+	loop.pktOutChWg.Add(1)
+	loop.wgGo(func() {
+		defer func() {
+			loop.pktOutChWg.Done()
+			close(loop.dispatchDone)
+		}()
+		loop.dispatcher()
+	})
+
+	loop.wgGo(func() {
+		defer func() {
+			close(loop.writeDone)
+			loop.closer.Close() // ensure IO is closed
+		}()
+		loop.writer()
+	})
+
 	<-loop.ctx.Done()
-	logger.Debug("ctx done")
+	logger.Debug("loop.ctx is done")
 
 	<-loop.dispatchDone
 	logger.Debug("remove all procs")
@@ -133,7 +155,7 @@ func (loop *LoopImpl) Run() {
 	loop.procWg.Wait()
 	logger.Debug("all procs done")
 
-	close(loop.packetOutputCh)
+	close(loop.pktOutCh)
 
 	loop.wg.Wait()
 	logger.Debug("all loops done")
@@ -164,62 +186,74 @@ func (loop *LoopImpl) StartLater(proc Proc) (procID uint32, handle func(bool) <-
 	ctx, cancel := context.WithCancel(loop.procCtx)
 	pktInCh := make(chan *pb.Packet)
 	pktOutCh := make(chan *pb.Packet)
-
-	pd := &loopProcData{
-		proc:    proc,
-		ctx:     ctx,
-		cancel:  cancel,
-		pktInCh: pktInCh,
+	closePktInChOnce := sync.Once{}
+	closePktInCh := func() {
+		closePktInChOnce.Do(func() { close(pktInCh) })
 	}
-	loop.procData[procID] = pd
+	loop.procData[procID] = &loopProcData{
+		proc:         proc,
+		ctx:          ctx,
+		cancel:       cancel,
+		pktInCh:      pktInCh,
+		closePktInCh: closePktInCh,
+	}
+
+	logger := loopLogger.NewLoggerf("proc-%v", procID)
+
+	loop.wgGo(func() {
+		select {
+		case <-ctx.Done():
+		case <-loop.dispatchDone:
+			closePktInCh()
+		}
+	})
 
 	sender := func() {
-		logger := loopLogger.NewLogger(fmt.Sprintf("sender[proc=%v]", procID))
+		logger := logger.NewLogger("sender")
 		logger.Debug("start")
 		defer logger.Debug("done")
 
 		for pkt := range pktOutCh {
-
 			// logger.Debugf("packet: [%v]", pkt)
 
 			// Must be the same.
 			pkt.SourceID = procID
 			pkt.TargetID = procID
 
-			select {
-			case loop.packetOutputCh <- pkt:
-			case <-loop.writeDone:
+			if ok := loop.outputPacket(pkt); !ok {
 				return
 			}
 		}
 	}
 
 	start := func() {
-		logger := loopLogger.NewLogger(fmt.Sprintf("proc[%v]", procID))
 		logger.Debugf("start kind=%v", proc.Kind())
 		defer logger.Debug("done")
 
 		sendDone := make(chan struct{})
+		loop.pktOutChWg.Add(1)
 		go func() {
 			sender()
 			close(sendDone)
+			loop.pktOutChWg.Done()
 		}()
 
 		runCtx := ProcRunCtx{
-			Context:          ctx,
-			Cancel:           cancel,
-			Loop:             loop,
-			PacketInputCh:    pktInCh,
-			PacketOutputCh:   pktOutCh,
-			packetOutputDone: loop.writeDone,
-			ProcID:           procID,
+			Context:    ctx,
+			Cancel:     cancel,
+			Loop:       loop,
+			PktInCh:    pktInCh,
+			PktOutCh:   pktOutCh,
+			PktOutDone: loop.writeDone,
+			ProcID:     procID,
 		}
 		proc.Run(&runCtx)
-		logger.Debug("proc.Run(&runCtx)")
+
+		// It's ok to close pktOutCh because proc is the only sender,
+		// and we need sender to loop.pktOutCh to stop.
 		close(pktOutCh)
-		logger.Debug("close(pktOutCh)")
 		<-sendDone
-		logger.Debug("<-sendDone")
+
 		loop.Remove(procID)
 	}
 
@@ -246,20 +280,16 @@ func (loop *LoopImpl) StartLater(proc Proc) (procID uint32, handle func(bool) <-
 }
 
 func (loop *LoopImpl) Remove(procID uint32) bool {
-	logger := loopLogger.NewLogger(fmt.Sprintf("remove[%v]", procID))
-	// logger.Debug("call")
+	logger := loopLogger.NewLoggerf("remove-%v", procID)
 
 	loop.procLock.Lock()
 	defer loop.procLock.Unlock()
-
-	// logger.Debug("start")
-	// defer logger.Debug("end")
 
 	pd, ok := loop.procData[procID]
 	if ok {
 		logger.Debugf("cleanup")
 
-		close(pd.pktInCh)
+		pd.closePktInCh()
 		pd.cancel()
 		delete(loop.procData, procID)
 
@@ -268,7 +298,7 @@ func (loop *LoopImpl) Remove(procID uint32) bool {
 		go func() {
 			defer loop.procWg.Done()
 			pkt := pb.NewCtrlPacket(procID, pb.PacketCtrl_Exit)
-			loop.putPacketToChannel(pkt, loop.packetOutputCh)
+			loop.outputPacket(pkt)
 		}()
 	}
 
@@ -290,19 +320,17 @@ func (loop *LoopImpl) Stop() {
 	loop.cancel()
 }
 
-// reader exits if reader is closed or loop is done
+// reader reads frames, decodes them as packets, and send packets to loop.pktInCh.
+// It exits only when the frame reader fails to read a frame.
 func (loop *LoopImpl) reader() {
 	logger := loopLogger.NewLogger("reader")
 	logger.Debug("start")
 	defer logger.Debug("done")
 
-	defer close(loop.packetInputCh)
-
 	for loop.isActive() {
 		frame, err := loop.frameRW.ReadFrame()
 		if err != nil {
 			logger.Debug("read frame:", err)
-			loop.Stop()
 			return
 		}
 
@@ -312,27 +340,35 @@ func (loop *LoopImpl) reader() {
 			continue
 		}
 
-		// logger.Debug("pkt in (reader):", pkt)
-
-		loop.putPacketToChannelPassively(pkt, loop.packetInputCh)
+		select {
+		case loop.pktInCh <- pkt:
+		case <-loop.ctx.Done():
+			return
+		}
 	}
 }
 
-// dispatcher dispatches the incoming packets to their target processors with timeout.
+// dispatcher gets packets from loop.pktInCh and dispatches the packets to their target processors' pktInCh with timeout.
 // It exits if loop.pktInCh is closed or the loop is done.
 func (loop *LoopImpl) dispatcher() {
 	logger := loopLogger.NewLogger("dispatcher")
 	logger.Debug("start")
 	defer logger.Debug("done")
 
-	defer close(loop.dispatchDone)
+	getNextPacket := func() *pb.Packet {
+		select {
+		case pkt := <-loop.pktInCh:
+			return pkt
+		case <-loop.ctx.Done():
+			return nil
+		}
+	}
 
-	for {
-		pkt := loop.drainPacketFromChannel(loop.packetInputCh)
+	for loop.isActive() {
+		pkt := getNextPacket()
 		if pkt == nil {
 			return
 		}
-		// logger.Debug("pkt in (dispatcher):", pkt)
 
 		// Handle exit packet from remote loop
 		if pkt.SourceID == 0 && pb.IsPacketWithCtrlKind(pkt, pb.PacketCtrl_Exit) {
@@ -364,21 +400,18 @@ func (loop *LoopImpl) dispatcher() {
 				Kind:     pb.PacketKind_PacketKindError,
 				Data:     []byte(err.Error()),
 			}
-			loop.putPacketToChannelPassively(errPkt, loop.packetOutputCh)
+			loop.outputPacket(errPkt)
 		}
 	}
 }
 
-// writer exits if loop.pktOutCh is closed or the writer fails
+// writer exits if loop.pktOutCh is closed or the writer fails.
 func (loop *LoopImpl) writer() {
 	logger := loopLogger.NewLogger("writer")
 	logger.Debug("start")
 	defer logger.Debug("done")
 
-	defer close(loop.writeDone)
-	defer loop.closer.Close()
-
-	for pkt := range loop.packetOutputCh {
+	for pkt := range loop.pktOutCh {
 		// logger.Debug("pkt out:", pkt)
 
 		buf, err := proto.Marshal(pkt)
@@ -412,38 +445,23 @@ func (loop *LoopImpl) dispatchToProc(pkt *pb.Packet) error {
 	return nil
 }
 
-// putPacketToChannel returns false if the packet cannot be put into the channel immediately and the loop context is done
-func (loop *LoopImpl) putPacketToChannel(pkt *pb.Packet, ch chan<- *pb.Packet) (ok bool) {
+func (loop *LoopImpl) wgGo(f func()) {
+	loop.wg.Add(1)
+	go func() {
+		defer loop.wg.Done()
+		f()
+	}()
+}
+
+func (loop *LoopImpl) outputPacket(pkt *pb.Packet) (ok bool) {
+	// If loop.writer is done, no one will drain loop.pktOutCh,
+	// so we need to stop sending pkt towards it.
 	select {
-	case ch <- pkt:
+	case loop.pktOutCh <- pkt:
 		return true
-	default:
-		select {
-		case ch <- pkt:
-			return true
-		case <-loop.ctx.Done():
-			return false
-		}
-	}
-}
-
-// putPacketToChannelPassively returns false if the packet cannot be put into the channel immediately and the loop context is done
-func (loop *LoopImpl) putPacketToChannelPassively(pkt *pb.Packet, ch chan<- *pb.Packet) (ok bool) {
-	select {
-	case <-loop.ctx.Done():
+	case <-loop.writeDone:
 		return false
-	default:
-		select {
-		case <-loop.ctx.Done():
-			return false
-		case ch <- pkt:
-			return true
-		}
 	}
-}
-
-func (loop *LoopImpl) drainPacketFromChannel(ch <-chan *pb.Packet) *pb.Packet {
-	return drainPacketFromChannel(loop.ctx, ch)
 }
 
 func drainPacketFromChannel(ctx context.Context, ch <-chan *pb.Packet) *pb.Packet {
