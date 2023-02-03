@@ -308,7 +308,7 @@ func (loop *LoopImpl) reader() {
 
 		pkt := &pb.Packet{}
 		if err = proto.Unmarshal(frame, pkt); err != nil {
-			logger.Warn("Unmarshal(frame, pb.Packet):", err)
+			logger.Error("cannot decode packet:", err)
 			continue
 		}
 
@@ -378,12 +378,7 @@ func (loop *LoopImpl) writer() {
 	defer close(loop.writeDone)
 	defer loop.closer.Close()
 
-	for {
-		pkt, ok := <-loop.packetOutputCh
-		if !ok {
-			return
-		}
-
+	for pkt := range loop.packetOutputCh {
 		// logger.Debug("pkt out:", pkt)
 
 		buf, err := proto.Marshal(pkt)
