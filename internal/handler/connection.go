@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -76,7 +77,10 @@ func Listen(ctx context.Context, endpoint string, handler Handler, maxConn int) 
 		}
 
 		conn, err := listener.Accept()
-		if err != nil {
+		if errors.Is(err, net.ErrClosed) {
+			logger.Warn("accept:", err)
+			break
+		} else if err != nil {
 			logger.Error("accept:", err)
 			continue
 		}

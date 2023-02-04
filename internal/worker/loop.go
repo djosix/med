@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/djosix/med/internal/helper"
 	"github.com/djosix/med/internal/logger"
 	pb "github.com/djosix/med/internal/protobuf"
 	"github.com/djosix/med/internal/readwriter"
@@ -49,7 +50,7 @@ type LoopImpl struct {
 	closer          io.Closer
 	dispatchTimeout time.Duration
 
-	wg       sync.WaitGroup
+	wg       *helper.WaitGroup
 	ctx      context.Context
 	cancel   context.CancelFunc
 	stopOnce sync.Once
@@ -96,7 +97,7 @@ func NewLoop(ctx context.Context, rwc io.ReadWriteCloser) *LoopImpl {
 		closer:          rwc,
 		dispatchTimeout: time.Duration(1) * time.Second,
 
-		wg:       sync.WaitGroup{},
+		wg:       helper.NewWaitGroup(),
 		ctx:      loopCtx,
 		cancel:   loopCancel,
 		stopOnce: sync.Once{},
@@ -121,13 +122,17 @@ func (loop *LoopImpl) Run() {
 		return
 	}
 
-	loop.wgGo(func() {
+	loop.wg.DoneFn = func(name string) {
+		logger.Debugf("wg: done=%v active=%v", name, loop.wg.ActiveNames())
+	}
+
+	loop.wg.GoName("reader", func() {
 		defer close(loop.pktInCh)
 		loop.reader()
 	})
 
 	loop.pktOutChWg.Add(1)
-	loop.wgGo(func() {
+	loop.wg.GoName("dispatcher", func() {
 		defer func() {
 			loop.pktOutChWg.Done()
 			close(loop.dispatchDone)
@@ -135,7 +140,7 @@ func (loop *LoopImpl) Run() {
 		loop.dispatcher()
 	})
 
-	loop.wgGo(func() {
+	loop.wg.GoName("writer", func() {
 		defer func() {
 			close(loop.writeDone)
 			loop.closer.Close() // ensure IO is closed
@@ -200,7 +205,7 @@ func (loop *LoopImpl) StartLater(proc Proc) (procID uint32, handle func(bool) <-
 
 	logger := loopLogger.NewLoggerf("proc-%v", procID)
 
-	loop.wgGo(func() {
+	loop.wg.GoName(fmt.Sprintf("closePktInCh-%v", procID), func() {
 		select {
 		case <-ctx.Done():
 		case <-loop.dispatchDone:
@@ -443,14 +448,6 @@ func (loop *LoopImpl) dispatchToProc(pkt *pb.Packet) error {
 		return fmt.Errorf("dispatch timeout")
 	}
 	return nil
-}
-
-func (loop *LoopImpl) wgGo(f func()) {
-	loop.wg.Add(1)
-	go func() {
-		defer loop.wg.Done()
-		f()
-	}()
 }
 
 func (loop *LoopImpl) outputPacket(pkt *pb.Packet) (ok bool) {

@@ -1,6 +1,10 @@
 package cmd
 
 import (
+	"fmt"
+	"time"
+
+	"github.com/djosix/med/internal/helper"
 	"github.com/djosix/med/internal/logger"
 	"github.com/spf13/cobra"
 )
@@ -17,22 +21,28 @@ func devMain(cmd *cobra.Command, args []string) error {
 	_, _ = cmd, args
 
 	logger.Log(1, "test")
+	wg := helper.NewWaitGroup()
+	wg.DoneFn = func(name string) {
+		logger.Info("done:", name)
+		logger.Info("not done:", wg.ActiveNames())
+	}
 
-	// wg := helper.NewNamedWaitGroup()
-	// wg.Go("sleep 1", func() {
-	// 	time.Sleep(1 * time.Second)
-	// })
-	// wg.Go("sleep 2", func() {
-	// 	time.Sleep(2 * time.Second)
-	// })
-	// wg.Go("sleep 3", func() {
-	// 	time.Sleep(3 * time.Second)
-	// })
+	wg.Go(func() {
+		time.Sleep(4 * time.Second)
+	})
 
-	// fmt.Println("wait")
-	// for wg.WaitOne() {
-	// 	fmt.Println(wg.ActiveNames())
-	// }
+	wg.Go(func() {
+		time.Sleep(1 * time.Second)
+	})
+	wg.Go(func() {
+		time.Sleep(2 * time.Second)
+	})
+	wg.Go(func() {
+		time.Sleep(3 * time.Second)
+	})
+
+	fmt.Println("wait")
+	wg.Wait()
 
 	// for
 

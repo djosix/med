@@ -36,7 +36,7 @@ func (s *Set[T]) Len() int {
 }
 
 func (s *Set[T]) Values() (values []T) {
-	for value, _ := range s.m {
+	for value := range s.m {
 		values = append(values, value)
 	}
 	return values

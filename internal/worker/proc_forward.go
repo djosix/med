@@ -160,11 +160,11 @@ func pfListen(ctx context.Context, endpoint string, dataIn pfDataInFn, dataOut p
 	ctx, cancel := context.WithCancel(ctx)
 	wg := sync.WaitGroup{}
 
-	type connData struct {
-		inCh      chan<- []byte
-		closeInCh func()
+	type connOps struct {
+		send  func([]byte)
+		close func()
 	}
-	conns := map[uint64]connData{}
+	conns := map[uint64]connOps{}
 	connMu := sync.Mutex{}
 	connWg := sync.WaitGroup{}
 
@@ -172,8 +172,8 @@ func pfListen(ctx context.Context, endpoint string, dataIn pfDataInFn, dataOut p
 		connMu.Lock()
 		defer connMu.Unlock()
 
-		if cd, ok := conns[idx]; ok {
-			cd.closeInCh()
+		if c, ok := conns[idx]; ok {
+			c.close()
 			delete(conns, idx)
 		}
 	}
@@ -237,9 +237,9 @@ func pfListen(ctx context.Context, endpoint string, dataIn pfDataInFn, dataOut p
 			once := sync.Once{}
 
 			connMu.Lock()
-			conns[idx] = connData{
-				inCh:      inCh,
-				closeInCh: func() { once.Do(func() { close(inCh) }) },
+			conns[idx] = connOps{
+				send:  func(data []byte) { inCh <- data },
+				close: func() { once.Do(func() { close(inCh); conn.Close() }) },
 			}
 			connMu.Unlock()
 
@@ -273,9 +273,9 @@ func pfListen(ctx context.Context, endpoint string, dataIn pfDataInFn, dataOut p
 			if c, ok := conns[idx]; ok {
 				switch state {
 				case pfStateNone:
-					c.inCh <- buf
+					c.send(buf)
 				case pfStateEnd:
-					go removeConn(idx)
+					go removeConn(idx) // avoid deadlock
 				}
 			} else {
 				switch state {
@@ -300,7 +300,7 @@ func pfListen(ctx context.Context, endpoint string, dataIn pfDataInFn, dataOut p
 
 	connMu.Lock()
 	for _, c := range conns {
-		c.closeInCh()
+		c.close()
 	}
 	connMu.Unlock()
 	connWg.Wait()
